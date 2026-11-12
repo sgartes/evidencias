@@ -1,5 +1,1 @@
-/* Preenche estes dois valores (ver LEIA-ME). Enquanto estiverem vazios, a app abre em modo demonstração. */
-window.SGA_CONFIG = {
-  API_URL: '',          // URL da Aplicação Web do Apps Script (termina em /exec)
-  GOOGLE_CLIENT_ID: ''  // ID de cliente OAuth (termina em .apps.googleusercontent.com)
-};
+window.SGA_CONFIG = { API_URL: 'https://script.google.com/macros/s/AKfycbySOmrHg2I6I68fH7LKEUG7Pi6uaU9IWucnC0d0NUCXqtVN2s6pXLShX7qoqqatWxz3/exec', GOOGLE_CLIENT_ID: '32545967311-elmo7utta2tq4pm373hk5g9c858m01jo.apps.googleusercontent.com' };
