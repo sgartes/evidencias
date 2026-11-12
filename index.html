@@ -900,6 +900,24 @@ function deckUI(paint) {
   const f = S.flow, list = f.order.map(alunoById).filter(Boolean), wrap = h('div');
   while (f.cursor < list.length && f.marks[list[f.cursor].id] !== undefined) f.cursor++;
   const c = counts(), cur = list[f.cursor];
+  if (f.modo === undefined) { const n = new Date(); f.modo = f.data === today() && n.getHours() * 60 + n.getMinutes() <= toMin(f.inicio || '00:00') + 30 ? 'catalogo' : 'cartoes'; }
+  const troca = h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => { f.modo = f.modo === 'catalogo' ? 'cartoes' : 'catalogo'; paint(); } }, f.modo === 'catalogo' ? 'Mudar para cartões (deslizar)' : 'Mudar para catálogo de fotos'));
+  if (f.modo === 'catalogo' && list.length) {
+    const resto = list.filter(a => f.marks[a.id] === undefined).map(a => a.id);
+    wrap.append(h('div', { class: 'row-between' }, h('span', { class: 'chip' }, `${list.length - c.falta} de ${list.length}`), h('span', { class: 'chip ok' }, `${c.t} presentes · ${c.h} H · ${c.m} M`)),
+      h('p', { class: 'mut cap', style: 'margin:8px 0 0' }, 'Toca em quem chegou. No fim, marca os restantes como faltas.'),
+      h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-top:10px' }, ...list.map(a => {
+        const v = f.marks[a.id];
+        return h('button', { type: 'button', 'aria-pressed': v === true ? 'true' : 'false', style: `border:3px solid ${v === true ? 'var(--ok)' : v === false ? 'var(--bad-l)' : 'var(--line)'};background:${v === true ? 'var(--ok-l)' : '#fff'};border-radius:16px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);opacity:${v === false ? '.55' : '1'}`,
+          onclick: () => { if (v === true) delete f.marks[a.id]; else { f.marks[a.id] = true; f.history.push(a.id); } paint(); } },
+          avatar(a), h('span', { style: 'text-align:center;line-height:1.2' }, a.nome.split(' ').filter(Boolean).slice(0, 2).join(' ')), v === true ? h('span', { class: 'chip ok' }, '✓ Veio') : v === false ? h('span', { class: 'chip bad' }, 'Faltou') : null);
+      })),
+      h('div', { class: 'tools', style: 'margin-top:12px;gap:8px;flex-wrap:wrap' },
+        resto.length ? h('button', { class: 'btn ghost small', onclick: () => { resto.forEach(id => { f.marks[id] = false; }); f.history.push(resto); paint(); } }, `Os restantes ${resto.length} faltaram`) : null,
+        h('button', { class: 'btn ghost small', onclick: () => novoAlunoFlow(paint) }, '＋ Novo aluno')),
+      troca);
+    return wrap;
+  }
   wrap.append(h('div', { class: 'row-between' }, h('span', { class: 'chip' }, `${list.length - c.falta} de ${list.length}`), h('span', { class: 'chip ok' }, `${c.t} presentes · ${c.h} H · ${c.m} M`)));
   let busy = false;
   const decide = (val, card) => {
@@ -928,6 +946,7 @@ function deckUI(paint) {
       h('div', { class: 'card' }, h('b', {}, `✗ Faltaram (${list.length - c.t})`), h('div', { class: 'namechips' }, chips(false).length ? chips(false) : h('span', { class: 'mut' }, 'Ninguém'))),
       h('p', { class: 'mut cap' }, 'Toca num nome para o mudar de lado.')));
   }
+  wrap.append(troca);
   wrap.append(h('div', { class: 'tools' },
     h('button', { class: 'btn ghost small', disabled: f.history.length ? null : true, onclick: () => {
       const last = f.history.pop(); const ids = Array.isArray(last) ? last : [last]; ids.forEach(id => delete f.marks[id]);
@@ -1114,7 +1133,7 @@ function stepAssin() {
   const needP = !S.me.assinatura;
   const hint = h('div'); const btn = h('button', { class: 'btn ok', onclick: finish }, 'Enviar evidências ✓');
   const check = () => {
-    const miss = []; if (!f.later) { if (!f.resp.trim()) miss.push('nome do responsável'); if (!f.assinR) miss.push('assinatura do responsável'); } if (needP && !f.assinP) miss.push('a tua assinatura'); if (!needP && !f.confirmP) miss.push('confirmar a tua assinatura');
+    const miss = []; if (!f.later) { if (!f.resp.trim()) miss.push('nome do responsável'); if (!f.assinR) miss.push('assinatura do responsável'); } if (needP && !f.assinP) miss.push('a tua assinatura'); if (!needP && f.modoP === 'nova' && !f.assinP) miss.push('a tua assinatura'); if (!needP && f.modoP !== 'nova' && !f.confirmP) miss.push('confirmar a tua assinatura');
     hint.replaceChildren(miss.length ? h('div', { class: 'hintline' }, 'Falta: ' + miss.join(', ')) : ''); btn.disabled = miss.length > 0 || f.saving;
     if (btn.disabled) btn.setAttribute('disabled', ''); else btn.removeAttribute('disabled');
   };
@@ -1143,8 +1162,14 @@ function stepAssin() {
         h('div', { style: 'height:12px' }), padR.el,
         h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => padR.clear() }, 'Limpar assinatura')),
         h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => { f.later = true; go(); } }, 'O funcionário assina mais tarde'))]);
-  if (!needP) box.append(h('h2', {}, 'A tua assinatura'), h('button', { class: 'card check' + (f.confirmP ? ' on' : ''), onclick: () => { f.confirmP = !f.confirmP; go(); } },
-    h('span', { class: 'box' }, f.confirmP ? '✓' : ''), h('div', { class: 'grow' }, h('b', {}, 'Assino esta aula como professor(a)'), h('div', { class: 'mut cap' }, 'Com a minha assinatura guardada')), h('img', { src: S.me.assinatura, alt: 'A tua assinatura', style: 'height:34px;max-width:90px' })));
+  if (!needP) {
+    box.append(h('h2', {}, 'A tua assinatura'), h('div', { class: 'seg', style: 'margin-bottom:10px' },
+      h('button', { type: 'button', class: f.modoP !== 'nova' ? 'on' : '', onclick: () => { f.modoP = 'guardada'; f.assinP = null; go(); } }, 'Usar a guardada'),
+      h('button', { type: 'button', class: f.modoP === 'nova' ? 'on' : '', onclick: () => { f.modoP = 'nova'; f.confirmP = false; go(); } }, 'Assinar agora')));
+    if (f.modoP === 'nova') { const padN = makePad(f.assinP, d => { f.assinP = d; check(); }); box.append(h('p', { class: 'mut cap' }, 'A nova assinatura fica guardada para as próximas aulas.'), padN.el, h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => padN.clear() }, 'Limpar'))); }
+    else box.append(h('button', { class: 'card check' + (f.confirmP ? ' on' : ''), onclick: () => { f.confirmP = !f.confirmP; go(); } },
+      h('span', { class: 'box' }, f.confirmP ? '✓' : ''), h('div', { class: 'grow' }, h('b', {}, 'Assino esta aula como professor(a)'), h('div', { class: 'mut cap' }, 'Com a minha assinatura guardada')), h('img', { src: S.me.assinatura, alt: 'A tua assinatura', style: 'height:34px;max-width:90px' })));
+  }
   if (needP) { const padP = makePad(f.assinP, d => { f.assinP = d; check(); }); box.append(h('h2', {}, 'A tua assinatura (só desta vez)'), h('p', { class: 'mut cap' }, 'Fica guardada para as próximas aulas.'), padP.el, h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => padP.clear() }, 'Limpar'))); }
   box.append(hint, h('div', { class: 'foot' }, h('button', { class: 'btn ghost', onclick: () => setStep(2) }, '‹ Voltar'), btn));
   check(); return box;
@@ -1155,7 +1180,7 @@ async function finish() {
   if (fora && !(await confirmBox('Fora do período do projeto', `Esta data está fora do período do projeto (${f.proj.data_inicio ? fmtShort(f.proj.data_inicio) : '…'} a ${f.proj.data_fim ? fmtShort(f.proj.data_fim) : '…'}). A aula fica registada, mas só conta nas folhas e nos pagamentos depois de o gestor aprovar.`, 'Enviar para aprovação'))) return;
   let semPost = false;
   if (f.lista && f.proj.post_publico !== 'nao') {
-    const sem = f.order.map(alunoById).filter(a => a && f.marks[a.id] === true && a.rgpd_estado !== 'assinado');
+    const sem = f.order.map(alunoById).filter(a => a && f.marks[a.id] === true && !RGPD_OK.includes(a.rgpd_estado) && a.rgpd_estado !== 'recusado' && !(f.rgpdFora || {})[a.id]);
     if (sem.length) semPost = !(await confirmBox('Sem consentimento RGPD', `${sem.map(a => a.nome).join(', ')} ${sem.length > 1 ? 'ainda não assinaram' : 'ainda não assinou'} o consentimento. Não há autorização formal para publicar. O formulário de evidências segue na mesma. Queres publicar a foto no Instagram?`, 'Publicar na mesma', 'Não publicar'));
   }
   f.saving = true;
@@ -1164,12 +1189,12 @@ async function finish() {
     idCliente: idc, grupoId: f.g.id, localId: f.local.id, data: f.data, inicio: f.inicio, fim: fromMin(toMin(f.inicio) + f.dur), duracaoMin: f.dur,
     profDeuId: S.me.id, profPrevistoId: f.g.professor_id, substituicao: f.subst ? 'sim' : 'nao', homens: c.h, mulheres: c.m,
     presencas: f.lista ? f.order.map(id => ({ alunoId: id, presente: f.marks[id] === true })) : [], novosAlunos: f.novos, listaGrupo: f.lista ? 'sim' : 'nao',
-    observacoes: f.obs.trim(), fotos: f.fotos.map(p => p.dataUrl), assinaturaResp: f.later ? null : f.assinR, nomeResp: f.later ? '' : f.resp.trim(), assinaturaProf: needP ? f.assinP : null, gps: f.gps, semPost
+    observacoes: f.obs.trim(), fotos: f.fotos.map(p => p.dataUrl), assinaturaResp: f.later ? null : f.assinR, nomeResp: f.later ? '' : f.resp.trim(), assinaturaProf: (needP || f.modoP === 'nova') ? f.assinP : null, gps: f.gps, semPost
   };
   // atualiza já o que a app sabe localmente
   f.novos.forEach(n => { if (!S.d.alunos.some(a => a.id === n.id)) S.d.alunos.push(n); });
   if (f.lista) f.order.forEach(id => { const a = alunoById(id); if (a && f.marks[id] === true && !a.grupo_id) a.grupo_id = f.g.id; });
-  f.g.com_lista = payload.listaGrupo; if (needP) S.me.assinatura = f.assinP;
+  f.g.com_lista = payload.listaGrupo; if ((needP || f.modoP === 'nova') && f.assinP) S.me.assinatura = f.assinP;
   const rec = { idCliente: idc, aulaId: null, estado: 'por_enviar', erro: '', grupoId: f.g.id, localId: f.local.id, projetoId: f.proj.id, data: f.data, inicio: f.inicio, fim: payload.fim, dur: f.dur, homens: c.h, mulheres: c.m, nomeResp: payload.nomeResp, semAssin: !payload.assinaturaResp, profId: S.me.id,
     form_estado: 'pendente', post_estado: f.proj.post_publico === 'nao' ? 'na' : semPost ? 'nao_publicar' : 'pendente', formUrl: '', formErro: '', fotosLocal: payload.fotos.slice(), aprovacao: fora ? 'pendente' : '' };
   S.recent.unshift(rec); S.queue.push({ idCliente: idc, payload });
