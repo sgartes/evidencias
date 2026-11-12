@@ -1,0 +1,1431 @@
+<!DOCTYPE html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F1592A">
+<title>SGArtes · Aulas</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>
+:root{--brand:#F1592A;--brand-d:#c9431a;--brand-l:#fff0ea;--ink:#241f1c;--mut:#665a53;--line:#efe6df;--bg:#fff8f3;--card:#fff;--ok:#1f9d57;--ok-l:#e5f7ec;--bad:#d8453f;--bad-l:#fdeceb;--warn:#a35f00;--warn-l:#fff3d6;--r:22px;--sh:0 2px 4px #5a2a1008,0 10px 28px #5a2a1012}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);font:15.5px/1.45 "Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer;transition:transform .12s,box-shadow .12s,background .12s}
+button:active,.btn:active{transform:scale(.97)}
+#app{max-width:560px;margin:0 auto;min-height:100vh;display:flex;flex-direction:column}
+.top{position:sticky;top:0;z-index:5;background:linear-gradient(135deg,#ff7a3d,#F1592A 60%,#e0431c);color:#fff;display:flex;align-items:center;gap:8px;padding:12px 16px;padding-top:max(12px,env(safe-area-inset-top));border-radius:0 0 26px 26px;box-shadow:0 8px 24px #f1592a40}
+.top b{font-size:17px;flex:1;letter-spacing:-.2px}
+.top .chip{background:#ffffff38;color:#fff;border:0;min-height:36px;backdrop-filter:blur(6px)}
+.demo{background:#fff3d6;color:#7a5200;text-align:center;font-size:13px;padding:7px 14px;margin:10px 16px 0;border-radius:12px}
+main{flex:1;padding:18px 16px 110px}
+main.flow{padding-bottom:28px}
+h1{font-size:24px;margin:4px 0 6px;line-height:1.15;letter-spacing:-.5px;font-weight:800}
+h2{font-size:17px;margin:26px 0 10px;font-weight:800}
+.cap{font-size:14px}.mut{color:var(--mut)}.ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+.card{background:var(--card);border:0;border-radius:var(--r);padding:18px;margin:0 0 14px;box-shadow:var(--sh)}
+.hero{background:linear-gradient(160deg,#fff,#fff0e8);box-shadow:0 0 0 2px #F1592A33,var(--sh)}
+.hero-t{font-size:22px;font-weight:800;line-height:1.15;margin:2px 0;letter-spacing:-.4px}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 13px;font-size:13px;font-weight:700;background:#f4ece6;color:var(--mut);border:0;white-space:nowrap}
+.chip.ok{background:var(--ok-l);color:var(--ok)}.chip.warn{background:var(--warn-l);color:var(--warn)}.chip.bad{background:var(--bad-l);color:var(--bad)}
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;min-height:54px;padding:0 20px;border-radius:18px;border:2px solid #F1592A44;background:#fff;color:var(--brand-d);font-weight:700;font-size:16px;width:100%;text-decoration:none;text-align:center;line-height:1.2;box-shadow:0 2px 0 #f1592a14}
+.btn.primary{background:linear-gradient(180deg,#ff6a3a,#F1592A);border-color:transparent;color:#fff;box-shadow:0 8px 18px #f1592a4d}
+.btn.ok{background:linear-gradient(180deg,#2bb56b,#1f9d57);border-color:transparent;color:#fff;box-shadow:0 8px 18px #1f9d5744}
+.btn.bad{border-color:#d8453f55;color:var(--bad);background:#fff}
+.btn.ghost{border-color:var(--line);background:#fff;color:var(--ink);font-weight:700;box-shadow:var(--sh)}
+.btn.small{min-height:42px;font-size:14.5px;width:auto;padding:0 18px;border-radius:16px}
+.btn[disabled]{opacity:.38;pointer-events:none;box-shadow:none}
+.link{background:none;border:0;color:var(--brand-d);font-weight:700;padding:10px 4px;font-size:16px}
+.icon{width:44px;height:44px;border-radius:50%;border:0;background:#fff;box-shadow:var(--sh);font-size:18px;flex:none}
+.row-between{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.nav{position:fixed;left:12px;right:12px;bottom:max(10px,env(safe-area-inset-bottom));background:#ffffffee;backdrop-filter:blur(12px);border-radius:26px;box-shadow:0 10px 34px #5a2a1030;z-index:6;max-width:536px;margin:0 auto}
+.nav-in{display:flex;padding:6px}
+.nav button{flex:1;border:0;background:none;padding:7px 4px;font-size:12px;font-weight:600;color:var(--mut);display:flex;flex-direction:column;align-items:center;border-radius:20px}
+.nav button.on{color:var(--brand-d);background:var(--brand-l)}
+.av{width:48px;height:48px;border-radius:50%;display:grid;place-items:center;font-weight:800;color:#fff;flex:none;overflow:hidden;font-size:17px;box-shadow:0 0 0 3px #fff,0 3px 10px #0002}
+.av.big{width:min(48vw,190px);height:min(48vw,190px);font-size:60px;box-shadow:0 0 0 6px #fff,0 12px 30px #0003}
+.row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.card.row{border-bottom:0;padding:16px 18px}
+.row .grow{flex:1;min-width:0}
+.flowtop{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.steps{display:flex;gap:6px;margin:4px 0 14px}
+.steps i{flex:1;height:7px;border-radius:4px;background:#f1e4db}
+.steps i.on{background:linear-gradient(90deg,#ff7a3d,#F1592A)}
+.deck{position:relative;height:min(52vh,400px);margin:12px 0 16px}
+.sw{position:absolute;inset:0 6px;background:#fff;border:3px solid #fff;border-radius:32px;box-shadow:0 16px 40px #5a2a1026;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;touch-action:pan-y;user-select:none;-webkit-user-select:none;will-change:transform}
+.sw[data-dir=yes]{border-color:var(--ok);background:var(--ok-l)}
+.sw[data-dir=no]{border-color:var(--bad);background:var(--bad-l)}
+.sw .nm{font-size:21px;font-weight:800;text-align:center;padding:0 16px;line-height:1.25;letter-spacing:-.3px}
+.sw .hint{position:absolute;bottom:14px;font-size:14px;color:var(--mut)}
+.decide{display:flex;gap:12px}
+.decide .btn{min-height:60px;font-size:18px;border-radius:22px}
+.tools{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-top:10px}
+.ctr{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.ctr-in{display:flex;align-items:center;gap:12px}
+.ctr .n{font-size:50px;font-weight:800;min-width:76px;text-align:center;line-height:1;letter-spacing:-2px}
+.round{width:70px;height:70px;border-radius:50%;border:0;background:#fff;font-size:36px;color:var(--brand-d);font-weight:700;line-height:1;box-shadow:var(--sh),inset 0 0 0 2px #F1592A33}
+.round.plus{background:linear-gradient(180deg,#ff6a3a,#F1592A);color:#fff;box-shadow:0 8px 18px #f1592a4d}
+.namechips{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.namechip{min-height:40px;padding:0 14px;border-radius:999px;border:0;background:#fff;font-weight:600;font-size:14.5px;box-shadow:var(--sh)}
+.thumbs{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.th{position:relative;aspect-ratio:1;border-radius:18px;overflow:hidden;background:#eee;border:0;padding:0;box-shadow:var(--sh)}
+.th img{width:100%;height:100%;object-fit:cover;display:block}
+.th .tag{position:absolute;left:6px;bottom:6px;background:var(--brand);color:#fff;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700}
+.th .x{position:absolute;right:6px;top:6px;width:32px;height:32px;border-radius:50%;border:0;background:#000a;color:#fff;font-size:16px}
+.shot{border:3px dashed #F1592A88;background:var(--brand-l);color:var(--brand-d);min-height:130px;font-size:20px;flex-direction:column;box-shadow:none;border-radius:26px}
+.in{width:100%;min-height:52px;border:2px solid transparent;border-radius:16px;padding:8px 14px;background:#fff;font-size:16px;box-shadow:var(--sh)}
+.in:focus{outline:none;border-color:var(--brand)}
+textarea.in{min-height:96px;resize:vertical}
+label.l{display:block;font-weight:700;margin:16px 0 8px}
+.seg{display:flex;gap:8px}
+.seg button,.pill{min-height:52px;border-radius:18px;border:2px solid transparent;background:#fff;font-weight:700;flex:1;box-shadow:var(--sh)}
+.pill{flex:none;padding:0 17px;border-radius:999px;min-height:46px}
+.seg button.on,.pill.on{border-color:var(--brand);background:var(--brand-l);color:var(--brand-d)}
+.pills{display:flex;flex-wrap:wrap;gap:8px}
+.padwrap{position:relative}
+.padwrap::before{content:"Assine aqui com o dedo ✍️";position:absolute;inset:0;display:grid;place-items:center;color:#cdbfb4;font-size:18px;pointer-events:none}
+.padwrap.has::before{display:none}
+.pad{width:100%;height:190px;border:2px dashed #e3cfc2;border-radius:22px;background:#fff;touch-action:none;display:block}
+.hintline{color:var(--warn);background:var(--warn-l);border-radius:16px;padding:11px 16px;font-weight:700;margin:12px 0}
+.foot{position:sticky;bottom:0;background:linear-gradient(#fff8f300,var(--bg) 24%);padding:20px 0 max(8px,env(safe-area-inset-bottom));display:flex;gap:10px;margin-top:8px}
+.foot .btn.ghost{width:34%;flex:none}
+.okmark{width:92px;height:92px;border-radius:50%;background:linear-gradient(180deg,#2bb56b,#1f9d57);color:#fff;font-size:52px;display:grid;place-items:center;margin:10px auto 6px;box-shadow:0 12px 28px #1f9d5755}
+.ov{position:fixed;inset:0;background:#2a14087a;backdrop-filter:blur(3px);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet{background:var(--bg);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:32px 32px 0 0;padding:18px 18px calc(20px + env(safe-area-inset-bottom))}
+.sheet-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:18px}
+.toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);background:#2b2320;color:#fff;padding:13px 20px;border-radius:18px;z-index:40;max-width:92%;font-size:16px;text-align:center;box-shadow:0 10px 30px #0004}
+.sheetscroll{overflow:auto;border-radius:16px;background:#fff;padding:10px;box-shadow:var(--sh)}
+.sheetscroll>div{min-width:860px}
+.staff{position:fixed;inset:0;background:var(--bg);z-index:30;overflow:auto}
+.staff-in{max-width:560px;margin:0 auto;padding:24px 18px calc(24px + env(safe-area-inset-bottom))}
+.staff .pad{height:300px}
+.login{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 22px;text-align:center;gap:10px}
+.check{display:flex;align-items:center;gap:12px;width:100%;text-align:left;border:2px solid transparent}
+.check.on{border-color:var(--ok);background:var(--ok-l)}
+.box{width:26px;height:26px;border-radius:8px;border:2px solid var(--line);display:grid;place-items:center;flex:none;background:#fff;font-weight:800;color:var(--ok)}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="config.js"></script>
+<script>
+'use strict';
+/* =====================================================================
+   SGArtes · Aulas — piloto
+   Corre em dois modos:
+   - ligado ao Google (Apps Script): google.script.run
+   - demonstração: dados fictícios guardados só neste telemóvel
+   ===================================================================== */
+const CFG = window.SGA_CONFIG || {};
+const IS_GS = !!CFG.API_URL;
+let TOKEN = '';
+const LOGO = 'data:image/png;base64,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';
+const VERSION = 'versão 2.0';
+
+/* ---------- utilidades ---------- */
+const $ = (s, el = document) => el.querySelector(s);
+function h(tag, attrs, ...kids) {
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v === null || v === undefined || v === false) continue;
+    if (k === 'class') el.className = v;
+    else if (k === 'style') el.style.cssText = v;
+    else if (k === 'html') el.innerHTML = v;
+    else if (k === 'value') el.value = v;
+    else if (k.startsWith('on')) el.addEventListener(k.slice(2), v);
+    else el.setAttribute(k, v === true ? '' : v);
+  }
+  for (const kid of kids.flat(Infinity)) {
+    if (kid === null || kid === undefined || kid === false) continue;
+    el.append(kid.nodeType ? kid : document.createTextNode(String(kid)));
+  }
+  return el;
+}
+['append', 'replaceChildren'].forEach(m => { const orig = Element.prototype[m]; Element.prototype[m] = function (...k) { return orig.apply(this, k.flat(Infinity).filter(x => x !== null && x !== undefined && x !== false)); }; });
+const pad2 = n => String(n).padStart(2, '0');
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const cap = s => s ? s[0].toUpperCase() + s.slice(1) : s;
+function today() { const d = new Date(); return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`; }
+function parseD(s) { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); }
+function dow(s) { return (parseD(s).getDay() + 6) % 7 + 1; }
+function fmtLong(s) { return parseD(s).toLocaleDateString('pt-PT', { weekday: 'long', day: 'numeric', month: 'long' }); }
+function fmtShort(s) { const [y, m, d] = s.split('-'); return `${d}/${m}/${y}`; }
+function toMin(t) { const [a, b] = String(t).split(':').map(Number); return a * 60 + (b || 0); }
+function fromMin(m) { m = ((m % 1440) + 1440) % 1440; return `${pad2(Math.floor(m / 60))}:${pad2(m % 60)}`; }
+function durTxt(m) { m = Number(m) || 0; const hh = Math.floor(m / 60), mm = m % 60; return hh ? (mm ? `${hh}h${pad2(mm)}` : `${hh}h`) : `${mm}min`; }
+const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+const DIAS = ['', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
+const uid = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'id-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 10);
+const firstName = n => String(n || '').split(' ')[0];
+const initials = n => String(n || '?').split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+const colorFor = n => { let x = 0; for (const c of String(n)) x = (x * 31 + c.charCodeAt(0)) % 360; return `hsl(${x} 42% 40%)`; };
+const byName = (a, b) => a.nome.localeCompare(b.nome, 'pt');
+
+function avatar(a, big) {
+  const el = h('div', { class: 'av' + (big ? ' big' : ''), style: a.foto_mini ? '' : `background:${colorFor(a.nome)}` });
+  if (a.foto_mini) el.append(h('img', { src: a.foto_mini, alt: '', style: 'width:100%;height:100%;object-fit:cover' }));
+  else el.textContent = initials(a.nome);
+  return el;
+}
+
+/* ---------- armazenamento local (IndexedDB com reserva em memória) ---------- */
+const kv = (() => {
+  let db = null; const mem = new Map();
+  const ready = new Promise(res => {
+    try {
+      const r = indexedDB.open('sgartes-aulas', 1);
+      r.onupgradeneeded = () => r.result.createObjectStore('kv');
+      r.onsuccess = () => { db = r.result; res(); };
+      r.onerror = () => res();
+      r.onblocked = () => res();
+    } catch (e) { res(); }
+  });
+  const run = (mode, fn) => new Promise((res, rej) => {
+    try {
+      const t = db.transaction('kv', mode); const rq = fn(t.objectStore('kv'));
+      t.oncomplete = () => res(rq && rq.result); t.onerror = () => rej(t.error); t.onabort = () => rej(t.error);
+    } catch (e) { rej(e); }
+  });
+  return {
+    async get(k, d) { await ready; if (db) { try { const v = await run('readonly', s => s.get(k)); if (v !== undefined) return v; } catch (e) { } } return mem.has(k) ? mem.get(k) : d; },
+    async set(k, v) { await ready; mem.set(k, v); if (db) { try { await run('readwrite', s => s.put(v, k)); } catch (e) { } } },
+    async del(k) { await ready; mem.delete(k); if (db) { try { await run('readwrite', s => s.delete(k)); } catch (e) { } } }
+  };
+})();
+
+/* ---------- imagens ---------- */
+function loadImg(file) {
+  return new Promise((res, rej) => {
+    const url = URL.createObjectURL(file); const im = new Image();
+    im.onload = () => { URL.revokeObjectURL(url); res(im); };
+    im.onerror = () => { URL.revokeObjectURL(url); rej(new Error('Não consegui abrir a imagem.')); };
+    im.src = url;
+  });
+}
+async function shrink(file, max, q) {
+  const im = await loadImg(file);
+  const k = Math.min(1, max / Math.max(im.naturalWidth, im.naturalHeight));
+  const c = document.createElement('canvas'); c.width = Math.round(im.naturalWidth * k); c.height = Math.round(im.naturalHeight * k);
+  c.getContext('2d').drawImage(im, 0, 0, c.width, c.height);
+  return c.toDataURL('image/jpeg', q);
+}
+async function squareThumb(file, size) {
+  const im = await loadImg(file); const s = Math.min(im.naturalWidth, im.naturalHeight);
+  const c = document.createElement('canvas'); c.width = c.height = size;
+  c.getContext('2d').drawImage(im, (im.naturalWidth - s) / 2, (im.naturalHeight - s) / 2, s, s, 0, 0, size, size);
+  let out = c.toDataURL('image/jpeg', .72);
+  if (out.length > 40000) out = c.toDataURL('image/jpeg', .5);
+  return out;
+}
+function dataUrlToBlob(u) {
+  const [head, b64] = u.split(','); const mime = (head.match(/:(.*?);/) || [])[1] || 'image/jpeg';
+  const bin = atob(b64); const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  return new Blob([arr], { type: mime });
+}
+
+/* ---------- avisos e janelas ---------- */
+let toastT;
+function toast(msg) {
+  document.querySelectorAll('.toast').forEach(t => t.remove());
+  const t = h('div', { class: 'toast' }, msg); document.body.append(t);
+  clearTimeout(toastT); toastT = setTimeout(() => t.remove(), 3200);
+}
+function openSheet(title, ...content) {
+  const ov = h('div', { class: 'ov', onclick: e => { if (e.target === ov) close(); } });
+  const box = h('div', { class: 'sheet' },
+    h('div', { class: 'sheet-h' }, h('b', {}, title), h('button', { class: 'icon', 'aria-label': 'Fechar', onclick: () => close() }, '✕')), ...content);
+  ov.append(box); document.body.append(ov);
+  function close() { ov.remove(); }
+  return { close, box };
+}
+function confirmBox(title, text, okLabel, cancelLabel) {
+  return new Promise(res => {
+    let done = false; const fin = v => { if (!done) { done = true; s.close(); res(v); } };
+    const s = openSheet(title, h('p', {}, text),
+      h('div', { style: 'display:flex;gap:10px' },
+        h('button', { class: 'btn ghost', onclick: () => fin(false) }, cancelLabel || 'Cancelar'),
+        h('button', { class: 'btn primary', onclick: () => fin(true) }, okLabel || 'Sim')));
+    s.box.parentElement.addEventListener('click', e => { if (e.target === s.box.parentElement) fin(false); });
+  });
+}
+async function copyText(t) {
+  try { await navigator.clipboard.writeText(t); return true; } catch (e) { }
+  const ta = h('textarea', { style: 'position:fixed;left:-999px;top:0' }); ta.value = t; document.body.append(ta); ta.select();
+  let ok = false; try { ok = document.execCommand('copy'); } catch (e) { } ta.remove(); return ok;
+}
+
+/* ---------- assinatura (canvas) ---------- */
+function makePad(initial, onChange) {
+  const cv = h('canvas', { class: 'pad' }); const wrap = h('div', { class: 'padwrap' + (initial ? ' has' : '') }, cv);
+  let ctx = null, W = 0, H = 0, drawing = false, last = null, ink = !!initial;
+  const size = () => {
+    const r = cv.getBoundingClientRect(); if (!r.width) return false;
+    const dpr = window.devicePixelRatio || 1; cv.width = Math.round(r.width * dpr); cv.height = Math.round(r.height * dpr);
+    ctx = cv.getContext('2d'); ctx.scale(dpr, dpr); ctx.lineWidth = 3.2; ctx.lineCap = 'round'; ctx.lineJoin = 'round'; ctx.strokeStyle = '#111'; ctx.fillStyle = '#111';
+    W = r.width; H = r.height;
+    if (initial) { const im = new Image(); im.onload = () => ctx && ctx.drawImage(im, 0, 0, W, H); im.src = initial; }
+    return true;
+  };
+  const pt = e => { const r = cv.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; };
+  cv.addEventListener('pointerdown', e => {
+    if (!ctx && !size()) return; e.preventDefault(); cv.setPointerCapture(e.pointerId);
+    drawing = true; last = pt(e); ink = true; wrap.classList.add('has');
+    ctx.beginPath(); ctx.arc(last.x, last.y, 1.6, 0, Math.PI * 2); ctx.fill();
+  });
+  cv.addEventListener('pointermove', e => {
+    if (!drawing) return; const p = pt(e);
+    ctx.beginPath(); ctx.moveTo(last.x, last.y); ctx.lineTo(p.x, p.y); ctx.stroke(); last = p;
+  });
+  const end = () => { if (!drawing) return; drawing = false; onChange(exportPng()); };
+  cv.addEventListener('pointerup', end); cv.addEventListener('pointercancel', end);
+  function exportPng() {
+    if (!ink || !ctx) return null;
+    const out = document.createElement('canvas'); out.width = 600; out.height = Math.round(600 * H / W);
+    out.getContext('2d').drawImage(cv, 0, 0, out.width, out.height); return out.toDataURL('image/png');
+  }
+  requestAnimationFrame(() => size());
+  return {
+    el: wrap,
+    clear() { if (ctx || size()) { ctx.clearRect(0, 0, W, H); } ink = false; initial = null; wrap.classList.remove('has'); onChange(null); }
+  };
+}
+
+/* =====================================================================
+   DADOS — duas implementações: Google (Apps Script) e demonstração
+   ===================================================================== */
+const gs = async (fn, ...args) => {
+  const name = fn.replace(/^api/, '').replace(/^./, c => c.toLowerCase());
+  let res, r;
+  try { res = await fetch(CFG.API_URL, { method: 'POST', body: JSON.stringify({ fn: name, args, token: TOKEN }) }); }
+  catch (e) { throw Object.assign(new Error('Sem ligação ao servidor.'), { server: false }); }
+  try { r = await res.json(); } catch (e) { throw Object.assign(new Error('O servidor respondeu de forma inesperada.'), { server: false }); }
+  if (r && r.auth) { authLost(); throw Object.assign(new Error(r.error), { server: false, auth: true }); }
+  if (r && r.ok === false) throw Object.assign(new Error(r.error || 'Erro no servidor'), { server: true });
+  return r;
+};
+async function authLost() { TOKEN = ''; await kv.del('token'); if (!document.querySelector('.login')) renderLogin('A sessão terminou. Entra outra vez.'); }
+
+let DEMO = null;
+function seedDemo() {
+  const t = today(), d = dow(t), hh = Math.min(Math.max(new Date().getHours(), 8), 20);
+  const shift = n => { const x = parseD(t); x.setDate(x.getDate() + n); return `${x.getFullYear()}-${pad2(x.getMonth() + 1)}-${pad2(x.getDate())}`; };
+  const nomes = [['Ana Exemplo', 'M'], ['Bruno Exemplo', 'H'], ['Carla Exemplo', 'M'], ['Diogo Exemplo', 'H'], ['Eva Exemplo', 'M'], ['Filipa Exemplo', 'M'],
+  ['Gil Exemplo', 'H'], ['Helena Exemplo', 'M'], ['Inês Exemplo', 'M'], ['João Exemplo', 'H'], ['Luísa Exemplo', 'M'], ['Miguel Exemplo', 'H']];
+  return {
+    projetos: [{ id: 'P-DEMO', nome: 'Projeto de Demonstração', programa: 'Demonstração', entidade: 'Junta de Demonstração', mencoes: '@sgartes.associacao @portoponto', hashtags: '#portoponto', legenda_modelo: '', post_publico: 'sim', folha_programa: 'ASSOCIATIVISMO 2026', folha_entidade: 'JUNTA DE DEMONSTRAÇÃO', folha_projeto: 'Projeto de Demonstração', data_inicio: shift(-120), data_fim: shift(120), tem_banner: true }],
+    locais: [{ id: 'L-D1', projeto_id: 'P-DEMO', nome: 'Centro de Demonstração', responsaveis: 'Rita Funcionária; Paulo Funcionário' }, { id: 'L-D2', projeto_id: 'P-DEMO', nome: 'Junta de Demonstração', responsaveis: '' }],
+    grupos: [
+      { id: 'G-D1', local_id: 'L-D1', nome: 'Grupo com lista', dia: d, hora_inicio: `${pad2(hh)}:00`, duracao_min: 60, professor_id: 'PR-DEMO', com_lista: 'sim', ativo: 'sim' },
+      { id: 'G-D2', local_id: 'L-D2', nome: 'Grupo só com contagem', dia: d, hora_inicio: `${pad2(Math.min(hh + 1, 22))}:00`, duracao_min: 60, professor_id: 'PR-DEMO', com_lista: 'nao', ativo: 'sim' },
+      { id: 'G-D3', local_id: 'L-D1', nome: 'Turma de outra pessoa', dia: d, hora_inicio: `${pad2(Math.min(hh + 2, 22))}:00`, duracao_min: 60, professor_id: 'PR-OUTRO', com_lista: 'sim', ativo: 'sim' }
+    ],
+    professores: [{ id: 'PR-DEMO', nome: 'Professor Demo', email: 'demo@exemplo.pt', papel: 'gestor', assinatura: '', valor_aula: 10 }, { id: 'PR-OUTRO', nome: 'Colega Exemplo', email: 'colega@exemplo.pt', papel: 'professor', assinatura: '', valor_aula: 10 }],
+    alunos: nomes.map(([n, g], i) => ({ id: 'A-D' + (i + 1), nome: n, genero: g, grupo_id: i < 10 ? '' : 'G-D3', local_id: 'L-D1', contacto: '', data_nascimento: i === 0 ? '1950-' + shift(2).slice(5) : i === 3 ? '1948-' + shift(-3).slice(5) : '', foto_mini: '', ativo: 'sim', crianca: 'nao', rgpd_estado: i % 4 === 1 ? '' : 'assinado', rgpd_data: i % 4 === 1 ? '' : shift(-30) })),
+    aulas: [], atrib: [], semAulas: []
+  };
+}
+function demoAluno(a) { const o = Object.assign({}, a); o.aniv = /^\d{4}-\d\d-\d\d$/.test(a.data_nascimento || '') ? a.data_nascimento.slice(5) : ''; o.pres = DEMO.aulas.filter(x => x.estado !== 'anulada').reduce((n, x) => n + ((x.presencas || []).some(z => z.alunoId === a.id && z.presente) ? 1 : 0), 0); return o; }
+const demoValida = a => a.estado !== 'anulada' && a.aprovacao !== 'pendente' && a.aprovacao !== 'rejeitada';
+function demoBanner() {
+  const c = document.createElement('canvas'); c.width = 1080; c.height = 170; const x = c.getContext('2d');
+  x.fillStyle = 'rgba(241,89,42,.92)'; x.fillRect(0, 0, 1080, 170); x.fillStyle = '#fff'; x.font = 'bold 54px sans-serif'; x.fillText('Banner do projeto (exemplo)', 40, 104);
+  return c.toDataURL('image/png');
+}
+
+const API = {
+  async login(cred) { return gs('login', cred); },
+  async boot() {
+    if (IS_GS) return gs('apiBootstrap');
+    let db = await kv.get('demo', null); if (!db || !db.professores[0].valor_aula) { db = seedDemo(); await kv.set('demo', db); }
+    const fresh = seedDemo(); db.grupos.forEach((g, i) => { g.dia = fresh.grupos[i].dia; g.hora_inicio = fresh.grupos[i].hora_inicio; });
+    db.atrib = db.atrib || []; db.semAulas = db.semAulas || []; DEMO = db;
+    const pid = await kv.get('profile', 'PR-DEMO'), me = db.professores.find(p => p.id === pid) || db.professores[0];
+    const gestor = me.papel === 'gestor', mine = new Set(db.grupos.filter(g => g.professor_id === me.id).map(g => g.id)), locs = new Set(db.grupos.filter(g => mine.has(g.id)).map(g => g.local_id));
+    return Object.assign({ ok: true }, db, {
+      me, alunos: db.alunos.filter(a => gestor || (a.grupo_id ? mine.has(a.grupo_id) : locs.has(a.local_id))).map(demoAluno),
+      aulas: db.aulas.map(a => Object.assign({}, a)), aprovacoes: gestor ? db.aulas.filter(a => a.aprovacao === 'pendente' && a.estado !== 'anulada') : []
+    });
+  },
+  async roster(gid) {
+    if (IS_GS) return gs('apiRoster', gid);
+    const g = DEMO.grupos.find(x => x.id === gid); return { ok: true, alunos: DEMO.alunos.filter(a => a.grupo_id === gid || (!a.grupo_id && a.local_id === g.local_id)).map(demoAluno) };
+  },
+  async uploadFoto(idc, i, dataUrl, base) { if (IS_GS) return gs('apiUploadFoto', idc, i, dataUrl, base); return { ok: true, url: 'demo://foto' }; },
+  async saveAula(p) {
+    if (IS_GS) return gs('apiSaveAula', p);
+    const db = DEMO; const ex = db.aulas.find(a => a.id_cliente === p.idCliente); if (ex) return { ok: true, aulaId: ex.id, formUrl: '', aprovacao: ex.aprovacao };
+    const id = 'AU-' + Date.now().toString(36), me = db.professores.find(x => x.id === (S.me || {}).id) || db.professores[0];
+    (p.novosAlunos || []).forEach(n => { if (!db.alunos.some(a => a.id === n.id)) { const o = Object.assign({}, n, { ativo: 'sim' }); if (o.rgpdAssinatura) { o.rgpd_estado = 'assinado'; o.rgpd_data = today(); } delete o.rgpdAssinatura; db.alunos.push(o); } });
+    (p.presencas || []).filter(x => x.presente).forEach(x => { const a = db.alunos.find(z => z.id === x.alunoId); if (a && !a.grupo_id) a.grupo_id = p.grupoId; });
+    const g = db.grupos.find(z => z.id === p.grupoId); if (g) g.com_lista = p.listaGrupo;
+    if (p.assinaturaProf) me.assinatura = p.assinaturaProf;
+    const proj = db.projetos[0], fora = (proj.data_inicio && p.data < proj.data_inicio) || (proj.data_fim && p.data > proj.data_fim);
+    db.aulas.push({ id, id_cliente: p.idCliente, grupo_id: p.grupoId, local_id: p.localId, data: p.data, hora_inicio: p.inicio, hora_fim: p.fim, duracao_min: p.duracaoMin, prof_deu_id: me.id, homens: p.homens, mulheres: p.mulheres, observacoes: p.observacoes, nome_resp: p.nomeResp, assinatura_resp: p.assinaturaResp, assinatura_prof: me.assinatura, sem_assinatura: !p.assinaturaResp, presencas: p.presencas, form_estado: 'pendente', post_estado: p.semPost ? 'nao_publicar' : 'pendente', estado: 'ativa', aprovacao: fora ? 'pendente' : '' });
+    await kv.set('demo', db); return { ok: true, aulaId: id, formUrl: '', aprovacao: fora ? 'pendente' : '' };
+  },
+  async editAula(id, patch) {
+    if (IS_GS) return gs('apiEditAula', id, patch);
+    const a = DEMO.aulas.find(z => z.id === id); if (!a) throw Object.assign(new Error('Aula não encontrada.'), { server: true });
+    if (patch.inicio) a.hora_inicio = patch.inicio; if (patch.duracaoMin) a.duracao_min = patch.duracaoMin; a.hora_fim = fromMin(toMin(a.hora_inicio) + Number(a.duracao_min));
+    if (patch.presencas) { a.presencas = patch.presencas; const al = id2 => DEMO.alunos.find(z => z.id === id2) || {}; a.homens = patch.presencas.filter(x => x.presente && al(x.alunoId).genero === 'H').length; a.mulheres = patch.presencas.filter(x => x.presente && al(x.alunoId).genero === 'M').length; }
+    else if (patch.homens !== undefined) { a.homens = patch.homens; a.mulheres = patch.mulheres; }
+    if (patch.observacoes !== undefined) a.observacoes = patch.observacoes;
+    await kv.set('demo', DEMO); return { ok: true, aula: Object.assign({}, a) };
+  },
+  async presencas(id) {
+    if (IS_GS) return gs('apiPresencas', id);
+    const a = DEMO.aulas.find(z => z.id === id) || {}; return { ok: true, presencas: (a.presencas || []).map(x => Object.assign({ nome: (DEMO.alunos.find(z => z.id === x.alunoId) || {}).nome }, x)) };
+  },
+  async anularAula(id, motivo) {
+    if (IS_GS) return gs('apiAnularAula', id, motivo);
+    const a = DEMO.aulas.find(z => z.id === id); if (a) { a.estado = 'anulada'; a.observacoes = (a.observacoes ? a.observacoes + ' ' : '') + `[Anulada: ${motivo}]`; } await kv.set('demo', DEMO); return { ok: true };
+  },
+  async aprovar(id, ok) {
+    if (IS_GS) return gs('apiAprovar', id, ok);
+    const a = DEMO.aulas.find(z => z.id === id); if (a) { a.aprovacao = ok ? 'aprovada' : 'rejeitada'; if (!ok) a.estado = 'anulada'; } await kv.set('demo', DEMO); return { ok: true };
+  },
+  async updateEstado(aulaId, patch) {
+    if (IS_GS) return gs('apiUpdateEstado', aulaId, patch);
+    const a = DEMO.aulas.find(z => z.id === aulaId); if (a) { Object.assign(a, patch); await kv.set('demo', DEMO); } return { ok: true };
+  },
+  async saveAluno(al) {
+    if (IS_GS) return gs('apiSaveAluno', al);
+    const o = Object.assign({}, al); if (o.rgpdAssinatura) { o.rgpd_estado = 'assinado'; o.rgpd_data = today(); } delete o.rgpdAssinatura; if (o.crianca === 'sim') o.foto_mini = '';
+    const i = DEMO.alunos.findIndex(z => z.id === o.id); if (i >= 0) DEMO.alunos[i] = Object.assign(DEMO.alunos[i], o); else DEMO.alunos.push(o);
+    await kv.set('demo', DEMO); return { ok: true, aluno: demoAluno(o) };
+  },
+  async saveProfSig(dataUrl) {
+    if (IS_GS) return gs('apiSaveProfAssinatura', dataUrl);
+    const p = DEMO.professores.find(z => z.id === S.me.id); if (p) p.assinatura = dataUrl; await kv.set('demo', DEMO); return { ok: true };
+  },
+  async month(localId, ym) {
+    if (IS_GS) return gs('apiMonth', localId, ym);
+    const aulas = DEMO.aulas.filter(a => a.local_id === localId && a.data.startsWith(ym) && demoValida(a)).map(a => Object.assign({}, a, { assinaturaResp: a.assinatura_resp, assinaturaProf: a.assinatura_prof }));
+    const feriados = DEMO.semAulas.filter(x => x.local_id === localId && x.tipo !== 'nao_prevista' && String(x.data).startsWith(ym)).map(x => { const g = DEMO.grupos.find(z => z.id === x.grupo_id) || {}; return { data: x.data, hora_inicio: g.hora_inicio || '', hora_fim: g.hora_inicio ? fromMin(toMin(g.hora_inicio) + (Number(g.duracao_min) || 60)) : '', duracao_min: g.duracao_min || 60, professor_id: x.professor_id, tipo: x.tipo, motivo: x.motivo || 'Feriado' }; });
+    return { ok: true, aulas, profAssin: {}, feriados };
+  },
+  async saveSemAula(p) {
+    if (IS_GS) return gs('apiSaveSemAula', p);
+    if (p.assinaturaProf) { const pr = DEMO.professores.find(z => z.id === S.me.id); if (pr) pr.assinatura = p.assinaturaProf; }
+    if (!DEMO.semAulas.some(x => x.id === 'SA-' + p.idCliente)) DEMO.semAulas.push({ id: 'SA-' + p.idCliente, grupo_id: p.grupoId, local_id: p.localId, data: p.data, tipo: p.tipo, motivo: p.motivo, professor_id: S.me.id });
+    await kv.set('demo', DEMO); return { ok: true, notificacao: p.tipo === 'nao_prevista' ? 'demo' : '' };
+  },
+  async assign(p) {
+    if (IS_GS) return gs('apiAssign', p);
+    DEMO.atrib = DEMO.atrib.filter(x => !(x.grupo_id === p.grupoId && x.data === p.data)); DEMO.atrib.push({ grupo_id: p.grupoId, data: p.data, professor_id: p.profId });
+    await kv.set('demo', DEMO); return { ok: true };
+  },
+  async alunoHist(id) {
+    if (IS_GS) return gs('apiAlunoHist', id);
+    const hist = []; DEMO.aulas.filter(demoValida).forEach(a => { const x = (a.presencas || []).find(z => z.alunoId === id); if (x) hist.push({ data: a.data, presente: !!x.presente }); }); return { ok: true, hist };
+  },
+  async signAulas(ids, nome, dataUrl) {
+    if (IS_GS) return gs('apiSignAulas', ids, nome, dataUrl);
+    DEMO.aulas.filter(a => ids.includes(a.id)).forEach(a => { a.assinatura_resp = dataUrl; a.nome_resp = nome; a.sem_assinatura = false; });
+    await kv.set('demo', DEMO); return { ok: true };
+  },
+  async savePdf(html, nome, sub) { if (IS_GS) return gs('apiSavePdf', html, nome, sub); return { ok: true, url: '', demo: true }; },
+  async pagamentos(ym) {
+    if (IS_GS) return gs('apiPagamentos', ym);
+    const gestor = S.me.papel === 'gestor', out = [];
+    DEMO.professores.forEach(p => {
+      if (!gestor && p.id !== S.me.id) return;
+      const val = Number(p.valor_aula) || 0, l = DEMO.aulas.filter(a => a.prof_deu_id === p.id && a.data.startsWith(ym) && demoValida(a));
+      if (l.length * val > 0) out.push({ profId: p.id, nome: p.nome, valor: val, total: l.length * val, aulas: l.map(a => ({ data: a.data, hora_inicio: a.hora_inicio, hora_fim: a.hora_fim, duracao_min: a.duracao_min, local: (DEMO.locais.find(x => x.id === a.local_id) || {}).nome })) });
+    });
+    return { ok: true, pagamentos: out };
+  },
+  async setValor(pid, v) {
+    if (IS_GS) return gs('apiSetValor', pid, v);
+    const p = DEMO.professores.find(x => x.id === pid); if (p) p.valor_aula = Number(v) || 0; await kv.set('demo', DEMO); return { ok: true };
+  },
+  async gerarRelatorios(ym) { if (IS_GS) return gs('apiGerarRelatorios', ym); return { ok: true, demo: true, resumoUrl: '', pagamentos: [] }; },
+  async banner(pid) { if (IS_GS) return gs('apiBanner', pid); return { ok: true, banner: demoBanner() }; },
+  async logout() { if (IS_GS) { try { await gs('apiLogout'); } catch (e) { } } },
+  async reset() { await kv.del('demo'); await kv.del('queue'); await kv.del('recent'); await kv.del('profile'); }
+};
+
+/* =====================================================================
+   ESTADO
+   ===================================================================== */
+const S = { collapse: {}, pend: 'sem', temp: {}, banners: {}, oth: { date: '' }, sigAll: false, me: null, d: null, tab: 'hoje', view: 'tab', recent: [], queue: [], flow: null, doneId: null, flushing: false, al: { q: '', localId: '' }, reg: { localId: '', ym: '', data: null } };
+const grupoById = id => S.d.grupos.find(g => g.id === id);
+const localById = id => S.d.locais.find(l => l.id === id);
+const projById = id => S.d.projetos.find(p => p.id === id);
+const profById = id => S.d.professores.find(p => p.id === id);
+const alunoById = id => S.d.alunos.find(a => a.id === id) || (S.flow && (S.flow.novos.find(a => a.id === id) || (S.temp[S.flow.g.id] || []).find(a => a.id === id)));
+const isGestor = () => !!(S.me && S.me.papel === 'gestor');
+const effProf = (g, date) => { const a = S.d.atrib.find(x => x.grupo_id === g.id && String(x.data) === date); return a ? a.professor_id : g.professor_id; };
+const semAulaFor = (gid, date) => S.d.semAulas.find(x => x.grupo_id === gid && String(x.data) === date);
+const closedFor = (gid, data) => S.recent.find(r => r.grupoId === gid && r.data === data && r.estado !== 'anulada') || S.d.aulas.find(a => a.grupo_id === gid && a.data === data && a.estado !== 'anulada');
+
+function easter(y) { const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), hh = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - hh - k) % 7, m = Math.floor((a + 11 * hh + 22 * l) / 451), mo = Math.floor((hh + l - 7 * m + 114) / 31), da = ((hh + l - 7 * m + 114) % 31) + 1; return new Date(y, mo - 1, da); }
+const FER = {};
+function feriado(ds) {
+  const y = Number(ds.slice(0, 4));
+  if (!FER[y]) {
+    const m = {}, add = (d, n) => { m[`${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`] = n; }, e = easter(y), rel = n => { const d = new Date(e); d.setDate(d.getDate() + n); return d; };
+    [['01-01', 'Ano Novo'], ['04-25', 'Dia da Liberdade'], ['05-01', 'Dia do Trabalhador'], ['06-10', 'Dia de Portugal'], ['06-24', 'São João (Porto)'], ['08-15', 'Assunção de Nossa Senhora'], ['10-05', 'Implantação da República'], ['11-01', 'Todos os Santos'], ['12-01', 'Restauração da Independência'], ['12-08', 'Imaculada Conceição'], ['12-25', 'Natal']].forEach(([md, n]) => { m[`${y}-${md}`] = n; });
+    add(rel(-2), 'Sexta-feira Santa'); add(e, 'Páscoa'); add(rel(60), 'Corpo de Deus');
+    FER[y] = m;
+  }
+  return FER[y][ds] || '';
+}
+function inPeriod(g, ds) { const pr = projById((localById(g.local_id) || {}).projeto_id) || {}; return !((pr.data_inicio && ds < pr.data_inicio) || (pr.data_fim && ds > pr.data_fim)); }
+function go(view, tab) { if (view) S.view = view; if (tab) S.tab = tab; render(); window.scrollTo(0, 0); }
+
+async function saveRecent() {
+  S.recent = S.recent.slice(0, 14);
+  S.recent.forEach((r, i) => { if (i >= 5 && r.post_estado !== 'pendente') r.fotosLocal = []; if (i >= 8) r.fotosLocal = []; });
+  await kv.set('recent', S.recent);
+}
+
+/* ---------- fila de envio (funciona sem rede) ---------- */
+function enqueue(kind, payload) { S.queue.push({ idCliente: uid(), kind, payload }); kv.set('queue', S.queue); chip(); flush(); }
+const OPS = {
+  semAula: p => API.saveSemAula(p), assign: p => API.assign(p), sign: p => API.signAulas(p.ids, p.nome, p.data),
+  estado: p => API.updateEstado(p.aulaId, p.patch), aluno: p => API.saveAluno(p)
+};
+async function sendAula(item, rec) {
+  const p = item.payload; p.fotoUrls = p.fotoUrls || [];
+  const base = `${p.data} ${(localById(p.localId) || {}).nome || ''}`;
+  while (p.fotos && p.fotos.length) { const u = await API.uploadFoto(p.idCliente, p.fotoUrls.length, p.fotos[0], base); p.fotoUrls.push(u.url); p.fotos.shift(); await kv.set('queue', S.queue); }
+  const r = await API.saveAula(p);
+  if (rec) {
+    rec.estado = 'enviada'; rec.aulaId = r.aulaId; rec.formUrl = r.formUrl || ''; rec.formErro = r.formErro || ''; rec.erro = ''; rec.aprovacao = r.aprovacao || '';
+    const patch = {}; if (rec.form_estado === 'enviado') patch.form_estado = 'enviado'; if (rec.post_estado === 'publicado') patch.post_estado = 'publicado';
+    if (Object.keys(patch).length) { try { await API.updateEstado(r.aulaId, patch); } catch (e) { } }
+  }
+}
+async function flush(manual) {
+  if (S.flushing || (IS_GS && !TOKEN)) return;
+  const todo = S.queue.filter(q => manual || !(S.recent.find(r => r.idCliente === q.idCliente) || {}).erro);
+  if (!todo.length) { chip(); return; }
+  S.flushing = true; chip();
+  for (const item of todo) {
+    const kind = item.kind || 'aula', rec = S.recent.find(r => r.idCliente === item.idCliente);
+    try {
+      if (kind === 'aula') await sendAula(item, rec); else await OPS[kind](item.payload);
+      S.queue = S.queue.filter(q => q !== item);
+    } catch (e) {
+      if (kind === 'aula') { if (rec) { rec.erro = e.server ? e.message : ''; rec.estado = e.server ? 'erro' : 'por_enviar'; } }
+      else if (e.server) { S.queue = S.queue.filter(q => q !== item); toast('Não foi possível registar: ' + e.message); }
+      if (!e.server) break;
+    }
+  }
+  S.flushing = false;
+  await kv.set('queue', S.queue); await saveRecent(); chip();
+  if (!document.querySelector('.ov, .staff') && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) {
+    if (S.view === 'done' || (S.view === 'tab' && (S.tab === 'hoje' || S.tab === 'pend'))) render();
+  }
+}
+function chip() {
+  const el = $('#syncchip'); if (!el) return; const n = S.queue.length;
+  const err = S.recent.some(r => r.estado === 'erro');
+  el.textContent = S.flushing ? 'A enviar…' : !IS_GS ? 'Demonstração' : err ? 'Erro ao enviar ↻' : !navigator.onLine ? (n ? `Sem rede · ${n} por enviar` : 'Sem rede') : n ? `${n} por enviar ↻` : 'Tudo enviado ✓';
+}
+
+/* =====================================================================
+   ECRÃS
+   ===================================================================== */
+function render() {
+  const app = $('#app'); app.replaceChildren(); if (!S.d) return;
+  app.append(topbar());
+  if (!IS_GS) app.append(h('div', { class: 'demo' }, `Modo demonstração · dados fictícios · a ver como ${isGestor() ? 'gestor' : 'professor'}`));
+  const main = h('main', { class: S.view === 'flow' ? 'flow' : '' }); app.append(main);
+  if (!S.me) { main.append(viewQuem()); chip(); return; }
+  if (S.view === 'flow') main.append(viewFlow());
+  else if (S.view === 'done') main.append(viewDone());
+  else { main.append(S.tab === 'hoje' ? viewHoje() : S.tab === 'pend' ? viewPend() : S.tab === 'alunos' ? viewAlunos() : viewRegistos()); app.append(nav()); }
+  chip();
+}
+function topbar() {
+  return h('div', { class: 'top' }, h('b', {}, 'SGArtes · Aulas'),
+    h('button', { class: 'chip', id: 'syncchip', onclick: async () => { await flush(true); refreshData(true); } }),
+    h('button', { class: 'chip', 'aria-label': 'Perfil', onclick: profileMenu }, S.me ? initials(S.me.nome) : '?'));
+}
+function nav() {
+  const t = (id, ico, label, n) => h('button', { class: S.tab === id ? 'on' : '', style: 'position:relative', onclick: () => go('tab', id) }, h('span', { style: 'font-size:20px' }, ico), label, n ? h('span', { style: 'position:absolute;top:2px;right:calc(50% - 26px);background:var(--brand);color:#fff;border-radius:999px;font-size:10px;font-weight:800;min-width:17px;height:17px;display:grid;place-items:center;padding:0 4px' }, n > 99 ? '99+' : n) : null);
+  return h('div', { class: 'nav' }, h('div', { class: 'nav-in' }, t('hoje', '📅', 'Hoje'), t('pend', '🗂️', 'Pendentes', lateItems().length + signItems().length + (isGestor() ? (S.d.aprovacoes || []).length : 0)), t('alunos', '👥', 'Alunos'), t('registos', '📄', 'Registos')));
+}
+function viewQuem() {
+  return h('div', {}, h('h1', {}, 'Quem és tu?'), ...S.d.professores.map(p => h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: async () => { await kv.set('profile', p.id); location.reload(); } }, p.nome)));
+}
+function profileMenu() {
+  const s = openSheet(S.me ? S.me.nome : 'Perfil',
+    h('p', { class: 'mut', style: 'margin-top:0' }, `${S.me.email || ''}${S.me.email ? ' · ' : ''}${isGestor() ? 'Gestor' : 'Professor'}`),
+    h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => { s.close(); sigModal(); } }, S.me && S.me.assinatura ? 'Alterar a minha assinatura' : 'Guardar a minha assinatura'),
+    !IS_GS ? h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: async () => { const o = S.d.professores.find(p => p.id !== S.me.id); if (o) { await kv.set('profile', o.id); location.reload(); } } }, `Ver como ${isGestor() ? 'professor' : 'gestor'} (demonstração)`) : null,
+    IS_GS ? h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: async () => {
+      if (S.queue.length && !(await confirmBox('Há registos por enviar', `${S.queue.length} registo(s) ainda não seguiram. Se saíres agora, ficam guardados neste telemóvel e seguem quando voltares a entrar.`, 'Sair na mesma'))) return;
+      await API.logout(); TOKEN = ''; await kv.del('token'); await kv.del('boot'); S.recent = S.recent.filter(r => r.estado !== 'enviada'); await saveRecent(); location.reload();
+    } }, 'Sair') : null,
+    !IS_GS ? h('button', { class: 'btn bad', style: 'margin-bottom:10px', onclick: async () => { if (await confirmBox('Reiniciar demonstração', 'Apaga as aulas e alunos de teste deste telemóvel.', 'Reiniciar')) { await API.reset(); location.reload(); } } }, 'Reiniciar a demonstração') : null,
+    h('p', { class: 'mut cap' }, `SGArtes · Aulas · ${VERSION}`));
+}
+function renderLogin(msg) {
+  const app = $('#app'), err = h('p', { class: 'mut', style: 'color:var(--bad);min-height:20px' }, msg || ''), btn = h('div', { style: 'min-height:48px' });
+  app.replaceChildren(h('div', { class: 'login' }, h('img', { src: LOGO, alt: 'SGArtes', style: 'height:64px' }), h('h1', {}, 'Aulas'), h('p', { class: 'mut', style: 'max-width:320px' }, 'Entra com a tua conta Google. Só funciona com o email que o gestor registou.'), btn, err,
+    h('p', { class: 'mut cap', style: 'max-width:320px' }, 'Os dados dos alunos pertencem à SGArtes e só são usados para gerir as aulas.')));
+  const init = () => {
+    google.accounts.id.initialize({ client_id: CFG.GOOGLE_CLIENT_ID, auto_select: true, callback: async resp => {
+      err.textContent = 'A entrar…';
+      try { const r = await API.login(resp.credential); TOKEN = r.token; await kv.set('token', TOKEN); main(); } catch (e) { err.textContent = e.message; }
+    } });
+    google.accounts.id.renderButton(btn, { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'continue_with', locale: 'pt-PT' });
+    google.accounts.id.prompt();
+  };
+  if (window.google && google.accounts && google.accounts.id) init();
+  else { const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.onload = init; sc.onerror = () => { err.textContent = 'Sem ligação: não consigo mostrar a entrada com Google.'; }; document.head.append(sc); }
+}
+function sigModal() {
+  let data = null; const pad = makePad(null, d => { data = d; });
+  const s = openSheet('A minha assinatura', h('p', { class: 'mut' }, 'Fica guardada e é usada em todas as tuas aulas.'), pad.el,
+    h('div', { style: 'display:flex;gap:10px;margin-top:12px' },
+      h('button', { class: 'btn ghost', onclick: () => pad.clear() }, 'Limpar'),
+      h('button', { class: 'btn primary', onclick: async () => {
+        if (!data) { toast('Assina primeiro.'); return; }
+        try { await API.saveProfSig(data); S.me.assinatura = data; s.close(); toast('Assinatura guardada ✓'); } catch (e) { toast('Sem ligação. Tenta mais tarde.'); }
+      } }, 'Guardar')));
+}
+
+/* ---------- HOJE ---------- */
+function todaysGroups(date) { return S.d.grupos.filter(g => g.ativo !== 'nao' && Number(g.dia) === dow(date) && !semAulaFor(g.id, date)).sort((a, b) => toMin(a.hora_inicio) - toMin(b.hora_inicio)); }
+function collapsible(el, key, title, count, kids) {
+  const open = !S.collapse[key];
+  el.append(h('button', { class: 'row-between', style: 'width:100%;background:none;border:0;padding:0;margin:22px 0 10px;text-align:left', onclick: async () => { S.collapse[key] = open; await kv.set('collapse', S.collapse); render(); } },
+    h('h2', { style: 'margin:0' }, `${title} (${count})`), h('span', { class: 'chip' }, open ? 'Esconder ▴' : 'Mostrar ▾')));
+  if (open) kids.forEach(k => el.append(k));
+}
+function viewHoje() {
+  const date = today(), el = h('div');
+  el.append(h('h1', {}, `Olá, ${firstName(S.me.nome)}`), h('div', { class: 'mut', style: 'margin-bottom:14px' }, cap(fmtLong(date))));
+  const all = todaysGroups(date), mine = all.filter(g => effProf(g, date) === S.me.id), others = all.filter(g => effProf(g, date) !== S.me.id);
+  const now = new Date(), nowM = now.getHours() * 60 + now.getMinutes();
+  const open = mine.filter(g => !closedFor(g.id, date));
+  const next = open.slice().sort((a, b) => Math.abs(toMin(a.hora_inicio) + 30 - nowM) - Math.abs(toMin(b.hora_inicio) + 30 - nowM))[0];
+  if (!mine.length) el.append(h('div', { class: 'card mut' }, 'Hoje não tens aulas marcadas.'));
+  if (next) el.append(nextCard(next));
+  mine.filter(g => g !== next).forEach(g => el.append(classRow(g, date)));
+  if (others.length) collapsible(el, 'outrasHoje', 'Outras aulas de hoje', others.length, others.map(g => classRow(g, date, true)));
+  const fer = feriado(date);
+  if (fer && mine.length) el.append(h('div', { class: 'hintline' }, `Hoje é feriado (${fer}). Se não houver aula, regista em “Não houve aula”.`));
+  el.append(h('button', { class: 'btn ghost', style: 'margin:4px 0 6px', onclick: manualModal }, '＋ Outra aula ou substituição'));
+  const nl = lateItems().length, ns = signItems().length, na = isGestor() ? (S.d.aprovacoes || []).length : 0;
+  if (nl || ns || na) el.append(h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 4px' },
+    nl ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'sem'; go('tab', 'pend'); } }, `🗂️ ${nl} sem evidências ›`) : null,
+    ns ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'assin'; go('tab', 'pend'); } }, `✍️ ${ns} por assinar ›`) : null,
+    na ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'aprov'; go('tab', 'pend'); } }, `⏳ ${na} por aprovar ›`) : null));
+  const bd = birthdays();
+  if (bd.length) collapsible(el, 'aniv', 'Aniversários', bd.length, [h('div', { class: 'card', style: 'padding:6px 18px' }, ...bd.map(x => h('div', { class: 'row' }, avatar(x.a), h('div', { class: 'grow' }, h('b', {}, x.a.nome), h('div', { class: 'mut cap' }, `${x.diff === 0 ? 'Faz anos hoje 🎂' : x.diff === 1 ? 'Faz anos amanhã' : x.diff > 1 ? `Faz anos daqui a ${x.diff} dias` : x.diff === -1 ? 'Fez anos ontem' : `Fez anos há ${-x.diff} dias`} · ${x.a.aniv.split('-').reverse().join('/')}`)))))]);
+  const todo = S.recent.filter(r => r.form_estado === 'pendente' || r.post_estado === 'pendente' || r.estado === 'erro');
+  if (todo.length) collapsible(el, 'todo', 'Por fazer', todo.length, todo.map(r => todoCard(r)));
+  return el;
+}
+const LOOKBACK = 30;
+function birthdays() {
+  const t = parseD(today()), mineG = new Set(S.d.grupos.filter(g => g.professor_id === S.me.id).map(g => g.id)), mineL = new Set(S.d.grupos.filter(g => mineG.has(g.id)).map(g => g.local_id)), out = [];
+  S.d.alunos.forEach(a => {
+    if (!a.aniv || a.ativo === 'nao' || !(a.grupo_id ? mineG.has(a.grupo_id) : mineL.has(a.local_id))) return;
+    const [m, d] = a.aniv.split('-').map(Number);
+    [t.getFullYear() - 1, t.getFullYear(), t.getFullYear() + 1].forEach(y => { const diff = Math.round((new Date(y, m - 1, d) - t) / 864e5); if (diff >= -7 && diff <= 7) out.push({ a, diff }); });
+  });
+  return out.sort((x, y) => x.diff - y.diff);
+}
+function viewPend() {
+  const el = h('div'), nl = lateItems().length, ns = signItems().length, na = (S.d.aprovacoes || []).length;
+  const opts = [['sem', `Sem evidências (${nl})`], ['assin', `Assinaturas (${ns})`]]; if (isGestor()) opts.push(['aprov', `Aprovar (${na})`]);
+  if (!opts.some(o => o[0] === S.pend)) S.pend = 'sem';
+  el.append(h('h1', {}, 'Pendentes'), h('div', { class: 'seg' }, ...opts.map(([v, l]) => h('button', { class: S.pend === v ? 'on' : '', style: 'font-size:13.5px;padding:0 6px', onclick: () => { S.pend = v; render(); } }, l))), h('div', { style: 'height:14px' }),
+    S.pend === 'sem' ? viewOutras() : S.pend === 'assin' ? viewAssin() : viewAprov());
+  return el;
+}
+function viewAprov() {
+  const el = h('div'), list = S.d.aprovacoes || [];
+  el.append(h('p', { class: 'mut cap', style: 'margin-top:0' }, 'Aulas registadas fora do período do projeto. Só contam nas folhas e nos pagamentos depois de aprovadas.'));
+  if (!list.length) el.append(h('div', { class: 'card', style: 'text-align:center' }, '🎉 Nada por aprovar'));
+  list.forEach(a => {
+    const l = localById(a.local_id) || {}, act = async ok => {
+      try { await API.aprovar(a.id, ok); } catch (e) { toast(e.server ? e.message : 'Sem ligação ao servidor.'); return; }
+      S.d.aprovacoes = S.d.aprovacoes.filter(x => x.id !== a.id); toast(ok ? 'Aula aprovada ✓' : 'Aula rejeitada'); render();
+    };
+    el.append(h('div', { class: 'card' }, h('b', {}, `${l.nome} · ${DIAS[dow(a.data)]} ${fmtShort(a.data)} · ${a.hora_inicio}`), h('div', { class: 'mut cap' }, `${(profById(a.prof_deu_id) || {}).nome || ''} · ${a.homens} H · ${a.mulheres} M${a.observacoes ? ' · ' + a.observacoes : ''}`),
+      h('div', { style: 'display:flex;gap:8px;margin-top:10px' }, h('button', { class: 'btn small ok', style: 'flex:1', onclick: () => act(true) }, 'Aprovar'), h('button', { class: 'btn small bad', style: 'flex:1', onclick: () => act(false) }, 'Rejeitar'))));
+  });
+  return el;
+}
+function manualModal() {
+  let date = today(); const list = h('div');
+  const dateIn = h('input', { class: 'in', type: 'date', value: date, onchange: e => { date = e.target.value || today(); } });
+  S.d.locais.forEach(l => {
+    const gs_ = S.d.grupos.filter(g => g.local_id === l.id && g.ativo !== 'nao'); if (!gs_.length) return;
+    list.append(h('h2', { style: 'margin:16px 0 8px;font-size:15px' }, l.nome), ...gs_.map(g => h('button', { class: 'btn ghost', style: 'margin-bottom:8px;justify-content:flex-start;font-size:14.5px', onclick: () => { s.close(); startFlow(g, date); } }, `${DIAS[Number(g.dia)] || ''} ${g.hora_inicio} · ${g.nome || ''} · ${(profById(g.professor_id) || {}).nome || ''}`)));
+  });
+  const s = openSheet('Outra aula ou substituição', h('p', { class: 'mut cap', style: 'margin-top:0' }, 'Escolhe a data e a turma. Serve para substituições e aulas fora do horário normal.'), h('label', { class: 'l', style: 'margin-top:0' }, 'Data da aula'), dateIn, list);
+}
+function viewOutras() {
+  const el = h('div'), late = lateItems();
+  el.append(h('p', { class: 'mut cap', style: 'margin-top:0' }, 'Aulas previstas nos últimos 30 dias, dentro do período do projeto, em que és o professor responsável e ainda não houve nenhuma submissão.'));
+  if (!late.length) el.append(h('div', { class: 'card', style: 'text-align:center' }, '🎉 Tudo em dia'));
+  let last = '';
+  late.forEach(x => {
+    if (x.date !== last) { last = x.date; el.append(h('h2', { style: 'margin:16px 0 8px;font-size:15px' }, `${cap(fmtLong(x.date))}`)); }
+    const l = localById(x.g.local_id);
+    el.append(h('div', { class: 'card', style: 'margin-bottom:10px' }, h('div', { class: 'row-between' }, h('b', {}, l.nome), x.fer ? h('span', { class: 'chip warn' }, 'Feriado: ' + x.fer) : null), h('div', { class: 'mut cap' }, groupLine(x.g)),
+      x.fer
+        ? h('div', { style: 'display:flex;gap:8px;margin-top:10px' }, h('button', { class: 'btn small primary', style: 'flex:1', onclick: () => quickFeriado(x.g, x.date, x.fer) }, 'Registar feriado'), h('button', { class: 'btn small ghost', onclick: () => startFlow(x.g, x.date) }, 'Houve aula'))
+        : h('div', { style: 'display:flex;gap:8px;margin-top:10px' }, h('button', { class: 'btn small primary', style: 'flex:1', onclick: () => startFlow(x.g, x.date) }, 'Enviar evidências'), h('button', { class: 'btn small ghost', onclick: () => semAulaModal(x.g, x.date) }, 'Não houve…')),
+      h('div', { class: 'tools', style: 'justify-content:flex-start' }, h('button', { class: 'link', style: 'padding:6px 0', onclick: () => atribuirModal(x.g, x.date) }, 'Atribuir a outro professor'))));
+  });
+  return el;
+}
+async function quickFeriado(g, date, nome) {
+  if (!S.me.assinatura) { semAulaModal(g, date); return; }
+  if (!(await confirmBox('Registar feriado', `${(localById(g.local_id) || {}).nome} · ${fmtShort(date)}: ${nome}. Fica na folha como “FERIADO – sem aula”, assinado por ti.`, 'Registar'))) return;
+  saveSemAula({ idCliente: uid(), grupoId: g.id, localId: g.local_id, data: date, tipo: 'feriado', motivo: nome, assinaturaProf: null });
+}
+function saveSemAula(p) {
+  if (!S.d.semAulas.some(x => x.id === 'SA-' + p.idCliente)) S.d.semAulas.push({ id: 'SA-' + p.idCliente, grupo_id: p.grupoId, local_id: p.localId, data: p.data, tipo: p.tipo, motivo: p.motivo, professor_id: S.me.id });
+  if (p.assinaturaProf) S.me.assinatura = p.assinaturaProf;
+  enqueue('semAula', p); render();
+  toast(p.tipo === 'nao_prevista' ? (IS_GS ? 'Registado ✓ A entidade é avisada por email quando seguir para o servidor.' : 'Registado. Na versão ligada, a entidade é avisada por email.') : 'Registo justificativo guardado ✓');
+}
+function viewAssin() {
+  const el = h('div'), items = signItems(), by = {};
+  items.forEach(x => (by[x.localId] = by[x.localId] || []).push(x));
+  el.append(h('p', { class: 'mut cap', style: 'margin-top:0' }, 'Aulas já registadas em que falta a assinatura do funcionário do local. Uma só assinatura pode valer para várias aulas.'),
+    h('div', { class: 'tools', style: 'justify-content:flex-start;margin:0 0 12px' }, h('button', { class: 'pill' + (S.sigAll ? ' on' : ''), onclick: () => { S.sigAll = !S.sigAll; render(); } }, 'Ver de todos os professores')));
+  if (!items.length) el.append(h('div', { class: 'card', style: 'text-align:center' }, '🎉 Nenhuma assinatura em falta'));
+  Object.keys(by).forEach(lid => el.append(h('div', { class: 'card' }, h('b', { style: 'font-size:16.5px' }, (localById(lid) || {}).nome || lid),
+    ...by[lid].map(x => h('div', { class: 'row', style: 'padding:8px 0' }, h('div', { class: 'grow' }, `${DIAS[dow(x.data)]} ${fmtShort(x.data)} · ${x.inicio}`), S.sigAll && x.profId ? h('span', { class: 'mut cap' }, firstName((profById(x.profId) || {}).nome)) : null)),
+    h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: () => signModal(lid) }, `Recolher assinatura (${by[lid].length})`))));
+  return el;
+}
+function atribuirModal(g, date) {
+  const loc = localById(g.local_id), others = S.d.professores.filter(p => p.id !== S.me.id);
+  if (!others.length) { toast('Não há outros professores.'); return; }
+  const psel = h('select', { class: 'in' }, ...others.map(p => h('option', { value: p.id }, p.nome)));
+  const s = openSheet('Atribuir a outro professor', h('p', { class: 'mut', style: 'margin-top:0' }, `${loc.nome} · ${DIAS[dow(date)]} ${fmtShort(date)} · ${g.hora_inicio}`), psel,
+    h('p', { class: 'mut cap' }, 'Essa pessoa passa a ser responsável por enviar as evidências desta aula e pela assinatura do funcionário.'),
+    h('button', { class: 'btn primary', onclick: async () => {
+      const p = { grupoId: g.id, data: date, profId: psel.value };
+      enqueue('assign', p);
+      S.d.atrib = S.d.atrib.filter(x => !(x.grupo_id === g.id && String(x.data) === date)); S.d.atrib.push({ grupo_id: g.id, data: date, professor_id: p.profId });
+      s.close(); toast('Aula atribuída ✓'); render();
+    } }, 'Atribuir aula'));
+}
+function semAulaModal(g, date) {
+  const loc = localById(g.local_id), ferNome = feriado(date); let mode = 'motivo', isFer = !!ferNome, sig = null; const needP = !S.me.assinatura;
+  const motivo = h('textarea', { class: 'in', style: 'min-height:80px' });
+  const area = h('div'), modeSeg = h('div', { class: 'seg' });
+  const pad = needP ? makePad(null, d => { sig = d; }) : null;
+  const paintArea = () => {
+    modeSeg.replaceChildren(...[['motivo', 'Com motivo'], ['nao_prevista', 'Aula não prevista']].map(([v, l]) => h('button', { class: mode === v ? 'on' : '', onclick: () => { mode = v; paintArea(); } }, l)));
+    motivo.placeholder = mode === 'motivo' ? 'Motivo da aula não ter acontecido' : 'Observação (opcional)';
+    area.replaceChildren(mode === 'motivo'
+      ? [h('div', { class: 'pills', style: 'margin:12px 0 8px' }, ...['Feriado', 'Local fechado', 'Professor indisponível', 'Mau tempo'].map(t => h('button', { class: 'pill', onclick: () => { isFer = t === 'Feriado'; motivo.value = t === 'Feriado' && ferNome ? ferNome : t; } }, t))), motivo,
+        h('p', { class: 'mut cap' }, 'Entra na folha mensal como uma linha de “sem aula”, com o motivo e sem assinaturas.')]
+      : [h('p', { class: 'mut', style: 'margin:12px 0 8px' }, 'Esta aula não estava realmente prevista para este dia.'), motivo,
+        h('p', { class: 'mut cap' }, 'Não aparece nas folhas de registo. A entidade é notificada por email.')]);
+    motivo.addEventListener('input', () => { if (mode === 'motivo') isFer = /^feriado$/i.test(motivo.value.trim()) || (!!ferNome && motivo.value.trim() === ferNome); });
+  };
+  paintArea(); if (ferNome) motivo.value = ferNome;
+  const s = openSheet('Não houve aula', h('p', { class: 'mut', style: 'margin-top:0' }, `${loc.nome} · ${DIAS[dow(date)]} ${fmtShort(date)} · ${g.hora_inicio}`), modeSeg, area,
+    h('label', { class: 'l' }, 'Assinatura do professor'), needP ? [pad.el, h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => pad.clear() }, 'Limpar'))] : h('p', { class: 'mut', style: 'margin:0' }, 'Assina com a tua assinatura guardada ✓'),
+    h('button', { class: 'btn primary', style: 'margin-top:14px', onclick: async () => {
+      if (mode === 'motivo' && motivo.value.trim().length < 3) { toast('Escreve o motivo.'); return; }
+      if (needP && !sig) { toast('Assina primeiro.'); return; }
+      const p = { idCliente: uid(), grupoId: g.id, localId: g.local_id, data: date, tipo: mode === 'nao_prevista' ? 'nao_prevista' : (isFer ? 'feriado' : 'motivo'), motivo: motivo.value.trim(), assinaturaProf: needP ? sig : null };
+      s.close(); saveSemAula(p);
+    } }, 'Registar'));
+}
+function lateItems() {
+  const out = [], gs_ = S.d.grupos.filter(g => g.ativo !== 'nao');
+  for (let i = 1; i <= LOOKBACK; i++) {
+    const d = new Date(); d.setDate(d.getDate() - i); const ds = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    gs_.forEach(g => { if (Number(g.dia) === dow(ds) && effProf(g, ds) === S.me.id && inPeriod(g, ds) && !closedFor(g.id, ds) && !semAulaFor(g.id, ds)) out.push({ g, date: ds, fer: feriado(ds) }); });
+  }
+  return out.sort((a, b) => b.date.localeCompare(a.date) || toMin(a.g.hora_inicio) - toMin(b.g.hora_inicio));
+}
+function pendingSign() {
+  const out = [], seen = new Set();
+  S.recent.forEach(r => { seen.add(r.idCliente); if (r.semAssin && r.estado !== 'anulada') out.push({ idCliente: r.idCliente, aulaId: r.aulaId, localId: r.localId, data: r.data, inicio: r.inicio, profId: r.profId || S.me.id }); });
+  S.d.aulas.forEach(a => { if (a.sem_assinatura && a.estado !== 'anulada' && !seen.has(a.id_cliente)) { seen.add(a.id_cliente); out.push({ idCliente: a.id_cliente, aulaId: a.id, localId: a.local_id, data: String(a.data), inicio: a.hora_inicio, profId: a.prof_deu_id, aula: a }); } });
+  return out.sort((a, b) => (a.data + a.inicio).localeCompare(b.data + b.inicio));
+}
+function signItems() { return pendingSign().filter(x => S.sigAll || !x.profId || x.profId === S.me.id); }
+function signModal(startLocal) {
+  const all = signItems(); if (!all.length) { toast('Nada por assinar.'); return; }
+  const locais = [...new Set(all.map(x => x.localId))]; let localId = locais.includes(startLocal) ? startLocal : locais[0], data = null; const chosen = new Set(all.filter(x => x.localId === localId).map(x => x.idCliente));
+  const body = h('div'), listBox = h('div'), btn = h('button', { class: 'btn ok', style: 'margin-top:14px' });
+  const nameIn = h('input', { class: 'in', placeholder: 'Nome do funcionário', autocomplete: 'off' });
+  const chipsBox = h('div', { class: 'namechips' });
+  const pad = makePad(null, d => { data = d; upd(); });
+  const items = () => all.filter(x => x.localId === localId);
+  const namesFor = () => { const n = []; const add = v => { v = (v || '').trim(); if (v && !n.includes(v)) n.push(v); }; S.recent.filter(r => r.localId === localId).forEach(r => add(r.nomeResp)); String((localById(localId) || {}).responsaveis || '').split(/[;,]/).forEach(add); return n.slice(0, 6); };
+  function upd() { const n = items().filter(x => chosen.has(x.idCliente)).length; btn.textContent = `Assinar ${n} aula(s)`; btn.disabled = !(n && data && nameIn.value.trim()); }
+  function paintList() {
+    const its = items();
+    listBox.replaceChildren(h('div', { class: 'row-between' }, h('b', {}, `${chosen.size} de ${its.length} selecionadas`), h('button', { class: 'link', onclick: () => { if (its.every(x => chosen.has(x.idCliente))) its.forEach(x => chosen.delete(x.idCliente)); else its.forEach(x => chosen.add(x.idCliente)); paintList(); } }, 'Todas / nenhuma')),
+      ...its.map(x => h('button', { class: 'row', style: 'width:100%;background:none;border:0;text-align:left;border-bottom:1px solid var(--line)', onclick: () => { chosen.has(x.idCliente) ? chosen.delete(x.idCliente) : chosen.add(x.idCliente); paintList(); } },
+        h('span', { style: 'font-size:20px' }, chosen.has(x.idCliente) ? '☑️' : '⬜'), h('div', { class: 'grow' }, h('b', {}, `${DIAS[dow(x.data)]} ${fmtShort(x.data)} · ${x.inicio}`)))));
+    upd();
+  }
+  nameIn.addEventListener('input', upd);
+  function paintLocal() { chipsBox.replaceChildren(...namesFor().map(n => h('button', { class: 'namechip', onclick: () => { nameIn.value = n; upd(); } }, n))); paintList(); }
+  const sel = h('select', { class: 'in', onchange: e => { localId = e.target.value; chosen.clear(); items().forEach(x => chosen.add(x.idCliente)); paintLocal(); } }, ...locais.map(id => h('option', { value: id }, (localById(id) || {}).nome || id)));
+  const s = openSheet('Recolher assinatura', locais.length > 1 ? [h('label', { class: 'l', style: 'margin-top:0' }, 'Local'), sel] : h('b', {}, (localById(localId) || {}).nome), listBox,
+    h('label', { class: 'l' }, 'Funcionário que assina'), nameIn, chipsBox, h('div', { style: 'height:12px' }), pad.el, h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => pad.clear() }, 'Limpar')), btn);
+  btn.addEventListener('click', async () => {
+    const nome = nameIn.value.trim(), sel_ = items().filter(x => chosen.has(x.idCliente)), apiIds = [];
+    for (const x of sel_) { const q = S.queue.find(z => z.idCliente === x.idCliente); if (q) { q.payload.assinaturaResp = data; q.payload.nomeResp = nome; } else if (x.aulaId) apiIds.push(x.aulaId); else { toast('Uma aula ainda não foi enviada. Tenta daqui a pouco.'); return; } }
+    if (apiIds.length) enqueue('sign', { ids: apiIds, nome, data });
+    sel_.forEach(x => { const r = S.recent.find(z => z.idCliente === x.idCliente); if (r) { r.semAssin = false; r.nomeResp = nome; } if (x.aula) { x.aula.sem_assinatura = false; x.aula.nome_resp = nome; } });
+    await kv.set('queue', S.queue); await saveRecent(); s.close(); toast(`${sel_.length} aula(s) assinada(s) ✓`); render();
+  });
+  paintLocal();
+}
+function groupLine(g) { const l = localById(g.local_id); return `${g.hora_inicio} · ${durTxt(g.duracao_min || 60)}${g.nome && g.nome !== l.nome ? ' · ' + g.nome : ''}`; }
+function nextCard(g) {
+  const l = localById(g.local_id);
+  return h('div', { class: 'card hero' }, h('div', { class: 'cap mut' }, 'Próxima aula'), h('div', { class: 'hero-t' }, l.nome), h('div', { class: 'mut' }, groupLine(g)),
+    h('button', { class: 'btn primary', style: 'margin-top:14px', onclick: () => startFlow(g, today()) }, '📸 Enviar evidências'),
+    h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => semAulaModal(g, today()) }, 'Hoje não houve aula'), h('button', { class: 'link', onclick: () => atribuirModal(g, today()) }, 'Atribuir a outro professor')));
+}
+function classRow(g, date, subst) {
+  const l = localById(g.local_id), done = closedFor(g.id, date), rec = done && S.recent.find(r => r.grupoId === g.id && r.data === date);
+  return h('div', { class: 'card row', style: 'margin-bottom:10px' },
+    h('div', { class: 'grow' }, h('b', {}, l.nome), h('div', { class: 'mut cap' }, groupLine(g) + (subst ? ' · ' + ((profById(effProf(g, date)) || {}).nome || '') : '')), !done && !subst ? h('div', { style: 'display:flex;gap:14px;flex-wrap:wrap' }, h('button', { class: 'link', style: 'padding:4px 0;font-size:13.5px', onclick: () => semAulaModal(g, date) }, 'Não houve aula'), h('button', { class: 'link', style: 'padding:4px 0;font-size:13.5px', onclick: () => atribuirModal(g, date) }, 'Atribuir')) : null),
+    done ? h('button', { class: 'chip ok', onclick: () => { if (rec) { S.doneId = rec.idCliente; go('done'); } } }, 'Enviada ✓')
+      : h('button', { class: 'btn small primary', onclick: () => startFlow(g, date) }, subst ? 'Substituir' : 'Enviar evidências'));
+}
+function todoCard(r) {
+  const l = localById(r.localId) || { nome: '' };
+  return h('button', { class: 'card', style: 'width:100%;text-align:left;display:block', onclick: () => { S.doneId = r.idCliente; go('done'); } },
+    h('b', {}, `${l.nome} · ${fmtShort(r.data)}`),
+    h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px' },
+      r.estado === 'erro' ? h('span', { class: 'chip bad' }, 'Erro ao enviar') : r.estado === 'por_enviar' ? h('span', { class: 'chip warn' }, 'Por enviar') : null,
+      r.form_estado === 'pendente' ? h('span', { class: 'chip warn' }, 'Formulário por enviar') : null,
+      r.post_estado === 'pendente' ? h('span', { class: 'chip warn' }, 'Post por publicar') : null));
+}
+/* ---------- FLUXO: FECHAR AULA ---------- */
+async function startFlow(g, data) {
+  if (closedFor(g.id, data) && !(await confirmBox('Evidências já enviadas', 'Já enviaste as evidências desta aula nesse dia. Queres enviar outra vez?', 'Enviar outra vez'))) return;
+  const local = localById(g.local_id), proj = projById(local.projeto_id);
+  S.flow = { g, local, proj, data, inicio: g.hora_inicio, dur: Number(g.duracao_min) || 60, subst: g.professor_id !== S.me.id, step: 1, lista: g.com_lista === 'sim',
+    marks: {}, order: [], cursor: 0, history: [], homens: 0, mulheres: 0, novos: [], fotos: [], obs: '', resp: '', assinR: null, assinP: null, gps: null, saving: false, later: data < today() };
+  S.flow.confirmP = false; S.flow.q = '';
+  if (S.flow.lista && IS_GS && !isGestor() && g.professor_id !== S.me.id && !S.temp[g.id]) {
+    try { S.temp[g.id] = (await API.roster(g.id)).alunos || []; }
+    catch (e) { S.flow.lista = false; toast('Sem rede: não consegui a lista desta turma. Regista só a contagem de homens e mulheres.'); }
+  }
+  S.flow.order = deckStudents().map(a => a.id);
+  go('flow');
+  if (IS_GS && navigator.geolocation) navigator.geolocation.getCurrentPosition(p => { if (S.flow) S.flow.gps = { lat: p.coords.latitude, lng: p.coords.longitude }; }, () => { }, { timeout: 5000, maximumAge: 60000 });
+}
+function deckStudents() {
+  const f = S.flow;
+  const pool = S.d.alunos.concat((S.temp[f.g.id] || []).filter(t => !S.d.alunos.some(a => a.id === t.id)));
+  return pool.filter(a => a.ativo !== 'nao' && a.local_id === f.local.id && (!a.grupo_id || a.grupo_id === f.g.id)).sort((a, b) => (b.pres || 0) - (a.pres || 0) || byName(a, b));
+}
+async function cancelFlow() {
+  const f = S.flow; const touched = Object.keys(f.marks).length || f.fotos.length || f.homens || f.mulheres || f.novos.length;
+  if (touched && !(await confirmBox('Cancelar esta aula?', 'O que já preencheste perde-se.', 'Cancelar aula'))) return;
+  S.flow = null; go('tab');
+}
+function counts() {
+  const f = S.flow;
+  if (!f.lista) return { h: f.homens, m: f.mulheres, t: f.homens + f.mulheres, falta: 0 };
+  const pres = f.order.map(alunoById).filter(a => a && f.marks[a.id] === true);
+  const hh = pres.filter(a => a.genero === 'H').length, mm = pres.filter(a => a.genero === 'M').length;
+  return { h: hh, m: mm, t: pres.length, falta: f.order.filter(id => f.marks[id] === undefined).length, semGenero: pres.length - hh - mm };
+}
+function viewFlow() {
+  const f = S.flow, el = h('div');
+  el.append(h('div', { class: 'flowtop' },
+    h('button', { class: 'icon', 'aria-label': 'Cancelar', onclick: cancelFlow }, '✕'),
+    h('div', { style: 'flex:1;min-width:0' }, h('b', { class: 'ell' }, f.local.nome), h('div', { class: 'mut cap ell' }, `${f.g.nome || ''} · ${f.inicio} · ${cap(fmtLong(f.data))}`)),
+    f.subst ? h('span', { class: 'chip warn' }, 'Substituição') : null));
+  el.append(h('div', { class: 'steps' }, [1, 2, 3].map(i => h('i', { class: i <= f.step ? 'on' : '' }))), h('h1', {}, `${f.step}. ${['Presenças', 'Foto de grupo', 'Assinatura'][f.step - 1]}`));
+  el.append(f.step === 1 ? stepPres() : f.step === 2 ? stepFoto() : stepAssin());
+  return el;
+}
+function footer(back, next, nextLabel, nextOk, hint) {
+  return h('div', {}, hint ? h('div', { class: 'hintline' }, hint) : null,
+    h('div', { class: 'foot' }, back ? h('button', { class: 'btn ghost', onclick: back }, '‹ Voltar') : null,
+      h('button', { class: 'btn primary', disabled: nextOk ? null : true, onclick: next }, nextLabel)));
+}
+function setStep(n) { S.flow.step = n; go(); }
+
+/* passo 1: presenças */
+function stepPres() {
+  const f = S.flow, box = h('div');
+  const paint = () => {
+    const c = counts();
+    box.replaceChildren(f.lista ? deckUI(paint) : counterUI(),
+      footer(null, () => setStep(2), 'Seguinte ›', f.lista ? c.falta === 0 : true,
+        f.lista ? (c.falta ? `Faltam ${c.falta} por marcar` : (c.t === 0 ? 'Ninguém veio? Podes continuar na mesma.' : '')) : (c.t === 0 ? 'Total 0 — confirma que ninguém veio.' : '')));
+  };
+  paint(); return box;
+}
+function counterUI() {
+  const f = S.flow;
+  const mk = (label, key) => {
+    const n = h('div', { class: 'n' }, f[key]);
+    const upd = () => { n.textContent = f[key]; tot.textContent = f.homens + f.mulheres; };
+    return h('div', { class: 'card ctr' }, h('b', { style: 'font-size:18px' }, label),
+      h('div', { class: 'ctr-in' }, h('button', { class: 'round', 'aria-label': 'menos', onclick: () => { f[key] = Math.max(0, f[key] - 1); upd(); } }, '−'), n,
+        h('button', { class: 'round plus', 'aria-label': 'mais', onclick: () => { f[key]++; upd(); } }, '+')));
+  };
+  const tot = h('b', {}, f.homens + f.mulheres);
+  return h('div', {}, mk('Homens', 'homens'), mk('Mulheres', 'mulheres'),
+    h('div', { class: 'row-between', style: 'padding:4px 6px;font-size:20px' }, h('span', {}, 'Total'), tot),
+    h('div', { class: 'tools' }, h('button', { class: 'link', onclick: async () => {
+      if (!(await confirmBox('Registar por nome', 'Este grupo passa a ter lista de alunos. Podes voltar atrás quando quiseres.', 'Passar a lista'))) return;
+      f.lista = true; f.order = deckStudents().map(a => a.id); f.marks = {}; f.history = []; f.cursor = 0; go();
+    } }, 'Já temos os nomes? Registar por nome')));
+}
+function deckUI(paint) {
+  const f = S.flow, list = f.order.map(alunoById).filter(Boolean), wrap = h('div');
+  while (f.cursor < list.length && f.marks[list[f.cursor].id] !== undefined) f.cursor++;
+  const c = counts(), cur = list[f.cursor];
+  wrap.append(h('div', { class: 'row-between' }, h('span', { class: 'chip' }, `${list.length - c.falta} de ${list.length}`), h('span', { class: 'chip ok' }, `${c.t} presentes · ${c.h} H · ${c.m} M`)));
+  let busy = false;
+  const decide = (val, card) => {
+    if (busy || !cur) return; busy = true;
+    const done = () => { f.marks[cur.id] = val; f.history.push(cur.id); paint(); };
+    if (card) { card.style.transition = 'transform .2s'; card.style.transform = `translateX(${val ? 520 : -520}px) rotate(${val ? 18 : -18}deg)`; setTimeout(done, 170); } else done();
+  };
+  if (!list.length) {
+    wrap.append(h('div', { class: 'card', style: 'text-align:center;margin-top:12px' }, h('p', {}, 'Este grupo ainda não tem alunos.'), h('button', { class: 'btn primary', onclick: () => novoAlunoFlow(paint) }, '＋ Novo aluno')));
+  } else if (cur) {
+    const res = h('div', { class: 'namechips', style: 'margin-top:6px' });
+    const qIn = h('input', { class: 'in', placeholder: '🔎 Chegou alguém? Procura o nome', value: f.q || '', style: 'margin-top:10px;min-height:46px', oninput: e => { f.q = e.target.value; paintRes(); } });
+    const paintRes = () => {
+      const q = (f.q || '').trim().toLowerCase();
+      res.replaceChildren(...(q.length < 2 ? [] : list.filter(a => f.marks[a.id] === undefined && a.nome.toLowerCase().includes(q)).slice(0, 6).map(a => h('button', { class: 'namechip', onclick: () => { f.marks[a.id] = true; f.history.push(a.id); f.q = ''; paint(); } }, '✓ ' + a.nome))));
+    };
+    paintRes(); wrap.append(qIn, res);
+    const card = h('div', { class: 'sw', 'data-dir': '' }, avatar(cur, true), h('div', { class: 'nm' }, cur.nome), h('div', { class: 'hint' }, '‹ desliza: faltou · veio: desliza ›'));
+    attachSwipe(card, v => decide(v, card));
+    wrap.append(h('div', { class: 'deck' }, card),
+      h('div', { class: 'decide' }, h('button', { class: 'btn bad', onclick: () => decide(false, card) }, '✗ Faltou'), h('button', { class: 'btn ok', onclick: () => decide(true, card) }, '✓ Veio')));
+  } else {
+    const chips = val => list.filter(a => f.marks[a.id] === val).map(a => h('button', { class: 'namechip', onclick: () => { f.marks[a.id] = !val; paint(); } }, a.nome));
+    wrap.append(h('div', { style: 'margin-top:12px' },
+      h('div', { class: 'card' }, h('b', {}, `✓ Presentes (${c.t})`), h('div', { class: 'namechips' }, chips(true).length ? chips(true) : h('span', { class: 'mut' }, 'Ninguém'))),
+      h('div', { class: 'card' }, h('b', {}, `✗ Faltaram (${list.length - c.t})`), h('div', { class: 'namechips' }, chips(false).length ? chips(false) : h('span', { class: 'mut' }, 'Ninguém'))),
+      h('p', { class: 'mut cap' }, 'Toca num nome para o mudar de lado.')));
+  }
+  wrap.append(h('div', { class: 'tools' },
+    h('button', { class: 'btn ghost small', disabled: f.history.length ? null : true, onclick: () => {
+      const last = f.history.pop(); const ids = Array.isArray(last) ? last : [last]; ids.forEach(id => delete f.marks[id]);
+      f.cursor = Math.max(0, list.findIndex(a => a.id === ids[0])); paint();
+    } }, '↶ Desfazer'),
+    h('button', { class: 'btn ghost small', onclick: () => novoAlunoFlow(paint) }, '＋ Novo aluno'),
+    cur ? h('button', { class: 'btn ghost small', onclick: () => { const ids = list.filter(a => f.marks[a.id] === undefined).map(a => a.id); ids.forEach(id => { f.marks[id] = true; }); f.history.push(ids); paint(); } }, 'Todos presentes') : null),
+    h('div', { class: 'tools' }, h('button', { class: 'link', onclick: async () => {
+      if (!(await confirmBox('Só contar', 'Este grupo passa a registar apenas o número de homens e mulheres.', 'Só contar'))) return;
+      f.lista = false; f.marks = {}; f.history = []; go();
+    } }, 'Só quero contar (sem nomes)')));
+  return wrap;
+}
+function attachSwipe(card, onDecide) {
+  let x0 = null, dx = 0;
+  card.addEventListener('pointerdown', e => { x0 = e.clientX; dx = 0; card.setPointerCapture(e.pointerId); card.style.transition = 'none'; });
+  card.addEventListener('pointermove', e => {
+    if (x0 === null) return; dx = e.clientX - x0;
+    card.style.transform = `translateX(${dx}px) rotate(${dx / 20}deg)`; card.dataset.dir = dx > 45 ? 'yes' : dx < -45 ? 'no' : '';
+  });
+  const end = () => {
+    if (x0 === null) return; const d = dx; x0 = null;
+    if (Math.abs(d) > 100) onDecide(d > 0);
+    else { card.style.transition = 'transform .18s'; card.style.transform = ''; card.dataset.dir = ''; }
+  };
+  card.addEventListener('pointerup', end); card.addEventListener('pointercancel', end);
+}
+function novoAlunoFlow(paint) {
+  const f = S.flow;
+  alunoModal(null, { localId: f.local.id, grupoId: f.g.id, fixed: true, onSave: a => { f.novos.push(a); f.order.push(a.id); f.marks[a.id] = true; f.history.push(a.id); paint(); toast(`${firstName(a.nome)} adicionado(a) e marcado(a) presente`); } });
+}
+
+function rgpdText(crianca, temFoto) {
+  return (crianca ? 'Autorizo, como encarregado(a) de educação, ' : 'Autorizo ') + 'a SGArtes a tratar estes dados apenas para gerir as aulas. ' +
+    (crianca ? 'Não é guardada fotografia individual do menor. ' : temFoto ? 'A fotografia individual serve só para organização interna da associação e não é publicada. ' : '') +
+    'As fotografias de grupo tiradas no fim das aulas são publicadas, ao abrigo do projeto, no site e nas redes sociais da SGArtes e das entidades parceiras' + (crianca ? ' (no caso de crianças, só na pasta interna do projeto)' : '') + '. Posso retirar este consentimento a qualquer momento junto da SGArtes.';
+}
+/* janela de aluno (novo ou editar) */
+function alunoModal(a, opt) {
+  const d = Object.assign({ nome: '', genero: '', contacto: '', data_nascimento: '', foto_mini: '', ativo: 'sim', local_id: opt.localId || '', grupo_id: opt.grupoId || '' }, a || {});
+  let genero = d.genero, foto = d.foto_mini, crianca = d.crianca === 'sim', rgpdSig = null;
+  const seeData = !a || isGestor();
+  const nome = h('input', { class: 'in', placeholder: 'Nome completo', value: d.nome, autocomplete: 'off' });
+  const seg = h('div', { class: 'seg' }, ...[['M', 'Mulher'], ['H', 'Homem']].map(([v, l]) => h('button', { type: 'button', class: genero === v ? 'on' : '', onclick: e => { genero = v; [...seg.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); } }, l)));
+  const av = h('div', { style: 'display:flex;align-items:center;gap:14px' });
+  const paintAv = () => av.replaceChildren(avatar({ nome: nome.value || '?', foto_mini: crianca ? '' : foto }), crianca ? h('span', { class: 'mut cap' }, 'Menor: sem fotografia individual') : h('button', { class: 'btn ghost small', type: 'button', onclick: () => file.click() }, foto ? 'Mudar foto' : '📷 Foto (opcional)'));
+  const rgpdBox = h('div', { class: 'card', style: 'margin-top:14px' });
+  const paintRgpd = () => {
+    if (d.rgpd_estado === 'assinado') { rgpdBox.replaceChildren(h('div', { class: 'row-between' }, h('b', {}, 'Consentimento RGPD'), h('span', { class: 'chip ok' }, '✓ Assinado' + (d.rgpd_data ? ' ' + fmtShort(d.rgpd_data) : '')))); return; }
+    const pad = makePad(null, x => { rgpdSig = x; });
+    rgpdBox.replaceChildren(h('div', { class: 'row-between' }, h('b', {}, 'Consentimento RGPD'), h('span', { class: 'chip warn' }, 'Por assinar')),
+      h('p', { class: 'cap', style: 'margin:8px 0' }, rgpdText(crianca, !!foto)), pad.el, h('div', { class: 'tools' }, h('button', { class: 'link', type: 'button', onclick: () => pad.clear() }, 'Limpar')),
+      h('p', { class: 'mut cap', style: 'margin:0' }, crianca ? 'Assinatura do encarregado de educação.' : 'Assinatura do aluno. Pode ficar para depois.'));
+  };
+  const file = h('input', { type: 'file', accept: 'image/*', capture: 'user', hidden: true, onchange: async e => { if (e.target.files[0]) { try { foto = await squareThumb(e.target.files[0], 160); paintAv(); } catch (err) { toast(err.message); } } } });
+  paintAv(); paintRgpd();
+  const kidSeg = h('div', { class: 'seg' }, ...[['nao', 'Adulto'], ['sim', 'Criança (menor)']].map(([v, l]) => h('button', { type: 'button', class: (crianca ? 'sim' : 'nao') === v ? 'on' : '', onclick: e => { crianca = v === 'sim'; [...kidSeg.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); paintAv(); if (d.rgpd_estado !== 'assinado') paintRgpd(); } }, l)));
+  const localSel = h('select', { class: 'in' }, ...S.d.locais.map(l => h('option', { value: l.id }, l.nome))); localSel.value = d.local_id || (S.d.locais[0] || {}).id;
+  const grupoSel = h('select', { class: 'in' });
+  const fillGrupos = () => { grupoSel.replaceChildren(h('option', { value: '' }, 'Sem grupo (aparece em todos os grupos do local)'), ...S.d.grupos.filter(g => g.local_id === localSel.value).map(g => h('option', { value: g.id }, `${DIAS[Number(g.dia)] || ''} ${g.hora_inicio} · ${g.nome || ''}`))); grupoSel.value = d.grupo_id && S.d.grupos.some(g => g.id === d.grupo_id && g.local_id === localSel.value) ? d.grupo_id : ''; };
+  localSel.addEventListener('change', () => { d.grupo_id = ''; fillGrupos(); }); fillGrupos();
+  const contacto = h('input', { class: 'in', placeholder: 'Telemóvel ou email', value: d.contacto, inputmode: 'tel' });
+  const nasc = h('input', { class: 'in', type: 'date', value: d.data_nascimento });
+  const ativo = h('div', { class: 'seg' }, ...[['sim', 'Ativo'], ['nao', 'Inativo']].map(([v, l]) => h('button', { type: 'button', class: d.ativo === v ? 'on' : '', onclick: e => { d.ativo = v; [...ativo.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); } }, l)));
+  const histBox = h('div', { class: 'card' }, h('span', { class: 'mut' }, 'A carregar presenças…'));
+  if (a) {
+    API.alunoHist(a.id).then(r => {
+      const hist = (r.hist || []).slice();
+      S.queue.forEach(q => { const x = (q.payload.presencas || []).find(z => z.alunoId === a.id); if (x) hist.push({ data: q.payload.data, presente: !!x.presente }); });
+      hist.sort((x, y) => y.data.localeCompare(x.data));
+      const pr = hist.filter(x => x.presente).length, fa = hist.length - pr;
+      histBox.replaceChildren(h('div', { class: 'row-between' }, h('b', {}, 'Assiduidade'), hist.length ? h('span', { class: 'chip ' + (pr / hist.length >= .7 ? 'ok' : 'warn') }, `${Math.round(100 * pr / hist.length)}%`) : null),
+        hist.length ? [h('div', { style: 'display:flex;gap:8px;margin:8px 0' }, h('span', { class: 'chip ok' }, `${pr} presenças`), h('span', { class: 'chip bad' }, `${fa} faltas`)),
+          ...hist.slice(0, 10).map(x => h('div', { class: 'row', style: 'padding:6px 0' }, h('span', {}, x.presente ? '✅' : '❌'), h('div', { class: 'grow' }, `${DIAS[dow(x.data)]} ${fmtShort(x.data)}`), h('span', { class: 'mut cap' }, x.presente ? 'Veio' : 'Faltou'))),
+          hist.length > 10 ? h('div', { class: 'mut cap' }, `+ ${hist.length - 10} registos mais antigos`) : null]
+          : h('p', { class: 'mut', style: 'margin:6px 0 0' }, 'Ainda sem registos de presença.'));
+    }).catch(() => histBox.replaceChildren(h('span', { class: 'mut' }, 'Não consegui carregar as presenças (sem ligação).')));
+  }
+  const s = openSheet(a ? 'Aluno' : 'Novo aluno', av, file, a ? histBox : null,
+    h('label', { class: 'l' }, 'Nome completo'), nome, h('label', { class: 'l' }, 'Género (conta para os totais)'), seg, h('label', { class: 'l' }, 'Idade'), kidSeg,
+    opt.fixed ? null : [h('label', { class: 'l' }, 'Local'), localSel, h('label', { class: 'l' }, 'Grupo'), grupoSel],
+    seeData ? h('details', { style: 'margin-top:14px' }, h('summary', { style: 'font-weight:700;padding:8px 0' }, 'Contacto e data de nascimento (podem ficar para depois)'), h('label', { class: 'l' }, 'Contacto'), contacto, h('label', { class: 'l' }, 'Data de nascimento'), nasc, a ? null : h('p', { class: 'mut cap' }, 'Depois de guardados, só o gestor os vê. O professor recebe apenas o aviso de aniversário.')) : null,
+    rgpdBox,
+    a ? [h('label', { class: 'l' }, 'Estado'), ativo] : null,
+    h('button', { class: 'btn primary', style: 'margin-top:18px', onclick: async () => {
+      if (nome.value.trim().length < 3) { toast('Escreve o nome completo.'); return; }
+      if (!genero) { toast('Escolhe o género.'); return; }
+      const out = Object.assign({}, d, { id: d.id || 'A-' + uid().slice(0, 8), nome: nome.value.trim(), genero, foto_mini: crianca ? '' : foto, crianca: crianca ? 'sim' : 'nao', contacto: contacto.value.trim(), data_nascimento: nasc.value,
+        local_id: opt.fixed ? opt.localId : localSel.value, grupo_id: opt.fixed ? opt.grupoId : grupoSel.value });
+      if (!seeData) { delete out.contacto; delete out.data_nascimento; }
+      if (nasc.value && /^\d{4}-\d\d-\d\d$/.test(nasc.value)) out.aniv = nasc.value.slice(5);
+      if (rgpdSig) { out.rgpdAssinatura = rgpdSig; out.rgpd_estado = 'assinado'; out.rgpd_data = today(); }
+      s.close(); await opt.onSave(out);
+    } }, 'Guardar'));
+  if (!a) setTimeout(() => nome.focus(), 60);
+}
+
+/* passo 2: foto */
+function stepFoto() {
+  const f = S.flow, box = h('div');
+  const cam = h('input', { type: 'file', accept: 'image/*', capture: 'environment', hidden: true, onchange: e => add(e.target) });
+  const gal = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, onchange: e => add(e.target) });
+  async function add(inp) {
+    const files = [...inp.files]; inp.value = '';
+    for (const file of files) {
+      if (f.fotos.length >= 10) { toast('No máximo 10 ficheiros.'); break; }
+      try { f.fotos.push({ id: uid(), dataUrl: await shrink(file, 1600, .82) }); } catch (e) { toast(e.message); }
+    }
+    paint();
+  }
+  const paint = () => {
+    box.replaceChildren(
+      h('button', { class: 'btn shot', onclick: () => cam.click() }, h('span', { style: 'font-size:38px' }, '📷'), f.fotos.length ? 'Tirar outra foto' : 'Tirar foto de grupo'),
+      h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => gal.click() }, 'Escolher da galeria')), cam, gal,
+      f.fotos.length ? h('div', { class: 'thumbs' }, ...f.fotos.map((p, i) => h('div', { class: 'th' },
+        h('button', { class: 'th', style: 'position:absolute;inset:0', 'aria-label': 'Usar no post', onclick: () => { f.fotos.splice(i, 1); f.fotos.unshift(p); paint(); } }, h('img', { src: p.dataUrl, alt: 'Foto ' + (i + 1) })),
+        i === 0 ? h('span', { class: 'tag' }, 'Foto do post') : null,
+        h('button', { class: 'x', 'aria-label': 'Remover', onclick: () => { f.fotos.splice(i, 1); paint(); } }, '✕')))) : null,
+      f.fotos.length > 1 ? h('p', { class: 'mut cap' }, 'Toca numa foto para a usar no post do Instagram.') : null,
+      h('label', { class: 'l' }, 'Observações (opcional)'),
+      h('textarea', { class: 'in', placeholder: 'Ex.: dia festivo, mostra, aula ao ar livre…', value: f.obs, oninput: e => { f.obs = e.target.value; } }),
+      h('div', { class: 'pills', style: 'margin-top:8px' }, ...['Dia festivo', 'Mostra', 'Aula ao ar livre'].map(t => h('button', { class: 'pill', onclick: e => { const ta = box.querySelector('textarea'); ta.value = (ta.value ? ta.value.trim() + '; ' : '') + t; f.obs = ta.value; } }, '+ ' + t))),
+      footer(() => setStep(1), () => setStep(3), 'Seguinte ›', f.fotos.length > 0, f.fotos.length ? '' : 'Falta a foto de grupo'));
+  };
+  paint(); return box;
+}
+
+/* ecrã simples para o funcionário do local assinar */
+function staffScreen() {
+  const f = S.flow; let data = null;
+  const nameIn = h('input', { class: 'in', style: 'font-size:20px;min-height:60px', placeholder: 'O seu nome', value: f.resp, autocomplete: 'off' });
+  const pad = makePad(null, d => { data = d; });
+  const ov = h('div', { class: 'staff' }, h('div', { class: 'staff-in' },
+    h('img', { src: LOGO, alt: 'SGArtes', style: 'height:44px' }), h('h1', { style: 'margin-top:14px' }, 'Confirmação da aula'),
+    h('p', { class: 'mut', style: 'font-size:17px' }, `${f.local.nome} · ${fmtShort(f.data)} · ${f.inicio} · ${counts().t} participantes`),
+    h('label', { class: 'l', style: 'font-size:17px' }, 'Nome do responsável do espaço'), nameIn,
+    h('label', { class: 'l', style: 'font-size:17px' }, 'Assinatura'), pad.el, h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => pad.clear() }, 'Limpar')),
+    h('button', { class: 'btn ok', style: 'margin-top:12px;min-height:62px;font-size:18px', onclick: () => {
+      if (!nameIn.value.trim() || !data) { toast('Escreva o seu nome e assine, por favor.'); return; }
+      f.resp = nameIn.value.trim(); f.assinR = data; ov.remove(); go();
+    } }, 'Concluído — devolver ao professor'),
+    h('button', { class: 'btn ghost', style: 'margin-top:10px', onclick: () => ov.remove() }, 'Cancelar')));
+  document.body.append(ov);
+}
+/* passo 3: assinatura e concluir */
+function previousNames() {
+  const f = S.flow, names = [];
+  const add = n => { n = (n || '').trim(); if (n && !names.includes(n)) names.push(n); };
+  S.recent.filter(r => r.localId === f.local.id).forEach(r => add(r.nomeResp));
+  S.d.aulas.filter(a => a.local_id === f.local.id).slice().reverse().forEach(a => add(a.nome_resp));
+  String(f.local.responsaveis || '').split(/[;,]/).forEach(add);
+  return names.slice(0, 6);
+}
+function stepAssin() {
+  const f = S.flow, c = counts(), box = h('div');
+  const needP = !S.me.assinatura;
+  const hint = h('div'); const btn = h('button', { class: 'btn ok', onclick: finish }, 'Enviar evidências ✓');
+  const check = () => {
+    const miss = []; if (!f.later) { if (!f.resp.trim()) miss.push('nome do responsável'); if (!f.assinR) miss.push('assinatura do responsável'); } if (needP && !f.assinP) miss.push('a tua assinatura'); if (!needP && !f.confirmP) miss.push('confirmar a tua assinatura');
+    hint.replaceChildren(miss.length ? h('div', { class: 'hintline' }, 'Falta: ' + miss.join(', ')) : ''); btn.disabled = miss.length > 0 || f.saving;
+    if (btn.disabled) btn.setAttribute('disabled', ''); else btn.removeAttribute('disabled');
+  };
+  const timeIn = h('input', { class: 'in', type: 'time', value: f.inicio, style: 'width:auto', onchange: e => { if (e.target.value) f.inicio = e.target.value; } });
+  const durs = [60, 90, 120, 180, 240]; if (!durs.includes(f.dur)) durs.push(f.dur); durs.sort((a, b) => a - b);
+  const pills = h('div', { class: 'pills' });
+  const hIn = h('input', { class: 'in', type: 'number', inputmode: 'numeric', min: '0', max: '12', style: 'width:84px;text-align:center' });
+  const mIn = h('input', { class: 'in', type: 'number', inputmode: 'numeric', min: '0', max: '59', style: 'width:84px;text-align:center' });
+  const syncIn = () => { hIn.value = Math.floor(f.dur / 60); mIn.value = f.dur % 60; };
+  const fromIn = () => { const m = Math.max(0, Math.min(12, parseInt(hIn.value) || 0)) * 60 + Math.max(0, Math.min(59, parseInt(mIn.value) || 0)); f.dur = m > 0 ? m : 60; paintPills(true); };
+  hIn.addEventListener('input', fromIn); mIn.addEventListener('input', fromIn);
+  const paintPills = skip => { pills.replaceChildren(...durs.map(m => h('button', { class: 'pill' + (f.dur === m ? ' on' : ''), onclick: () => { f.dur = m; paintPills(); } }, durTxt(m)))); if (!skip) syncIn(); };
+  paintPills();
+  const custom = h('div', { style: 'display:flex;align-items:center;gap:8px;margin-top:10px' }, h('span', { class: 'mut' }, 'Outra duração:'), hIn, h('span', {}, 'h'), mIn, h('span', {}, 'min'));
+  const nameIn = h('input', { class: 'in', placeholder: 'Nome do funcionário', value: f.resp, autocomplete: 'off', oninput: e => { f.resp = e.target.value; check(); } });
+  const prevs = previousNames();
+  const padR = makePad(f.assinR, d => { f.assinR = d; check(); });
+  box.append(
+    h('div', { class: 'card' }, h('div', { class: 'row-between' }, h('b', {}, 'Resumo'), h('span', { class: 'chip ok' }, `${c.h} H · ${c.m} M · ${c.t} total`)),
+      h('label', { class: 'l', style: 'margin-top:12px' }, 'Hora de início'), timeIn, h('label', { class: 'l' }, 'Duração'), pills, custom),
+    f.later
+      ? h('div', { class: 'card', style: 'margin-top:12px' }, h('b', {}, '✍️ O funcionário assina mais tarde'), h('p', { class: 'mut', style: 'margin:6px 0 10px' }, 'A aula fica registada e aparece em “Por assinar”, onde podes recolher a assinatura de várias aulas de uma vez.'), h('button', { class: 'btn ghost small', onclick: () => { f.later = false; go(); } }, 'Afinal assina agora'))
+      : [h('h2', { style: 'margin-top:8px' }, 'Responsável do espaço'), nameIn,
+        prevs.length ? h('div', { class: 'namechips' }, ...prevs.map(n => h('button', { class: 'namechip', onclick: () => { nameIn.value = n; f.resp = n; check(); } }, n))) : null,
+        h('button', { class: 'btn ghost', style: 'margin-top:12px', onclick: staffScreen }, '📱 Entregar o telemóvel ao funcionário'),
+        h('div', { style: 'height:12px' }), padR.el,
+        h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => padR.clear() }, 'Limpar assinatura')),
+        h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => { f.later = true; go(); } }, 'O funcionário assina mais tarde'))]);
+  if (!needP) box.append(h('h2', {}, 'A tua assinatura'), h('button', { class: 'card check' + (f.confirmP ? ' on' : ''), onclick: () => { f.confirmP = !f.confirmP; go(); } },
+    h('span', { class: 'box' }, f.confirmP ? '✓' : ''), h('div', { class: 'grow' }, h('b', {}, 'Assino esta aula como professor(a)'), h('div', { class: 'mut cap' }, 'Com a minha assinatura guardada')), h('img', { src: S.me.assinatura, alt: 'A tua assinatura', style: 'height:34px;max-width:90px' })));
+  if (needP) { const padP = makePad(f.assinP, d => { f.assinP = d; check(); }); box.append(h('h2', {}, 'A tua assinatura (só desta vez)'), h('p', { class: 'mut cap' }, 'Fica guardada para as próximas aulas.'), padP.el, h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => padP.clear() }, 'Limpar'))); }
+  box.append(hint, h('div', { class: 'foot' }, h('button', { class: 'btn ghost', onclick: () => setStep(2) }, '‹ Voltar'), btn));
+  check(); return box;
+}
+async function finish() {
+  const f = S.flow; if (f.saving) return;
+  const fora = (f.proj.data_inicio && f.data < f.proj.data_inicio) || (f.proj.data_fim && f.data > f.proj.data_fim);
+  if (fora && !(await confirmBox('Fora do período do projeto', `Esta data está fora do período do projeto (${f.proj.data_inicio ? fmtShort(f.proj.data_inicio) : '…'} a ${f.proj.data_fim ? fmtShort(f.proj.data_fim) : '…'}). A aula fica registada, mas só conta nas folhas e nos pagamentos depois de o gestor aprovar.`, 'Enviar para aprovação'))) return;
+  let semPost = false;
+  if (f.lista && f.proj.post_publico !== 'nao') {
+    const sem = f.order.map(alunoById).filter(a => a && f.marks[a.id] === true && a.rgpd_estado !== 'assinado');
+    if (sem.length) semPost = !(await confirmBox('Sem consentimento RGPD', `${sem.map(a => a.nome).join(', ')} ${sem.length > 1 ? 'ainda não assinaram' : 'ainda não assinou'} o consentimento. Não há autorização formal para publicar. O formulário de evidências segue na mesma. Queres publicar a foto no Instagram?`, 'Publicar na mesma', 'Não publicar'));
+  }
+  f.saving = true;
+  const c = counts(), idc = uid(), needP = !S.me.assinatura;
+  const payload = {
+    idCliente: idc, grupoId: f.g.id, localId: f.local.id, data: f.data, inicio: f.inicio, fim: fromMin(toMin(f.inicio) + f.dur), duracaoMin: f.dur,
+    profDeuId: S.me.id, profPrevistoId: f.g.professor_id, substituicao: f.subst ? 'sim' : 'nao', homens: c.h, mulheres: c.m,
+    presencas: f.lista ? f.order.map(id => ({ alunoId: id, presente: f.marks[id] === true })) : [], novosAlunos: f.novos, listaGrupo: f.lista ? 'sim' : 'nao',
+    observacoes: f.obs.trim(), fotos: f.fotos.map(p => p.dataUrl), assinaturaResp: f.later ? null : f.assinR, nomeResp: f.later ? '' : f.resp.trim(), assinaturaProf: needP ? f.assinP : null, gps: f.gps, semPost
+  };
+  // atualiza já o que a app sabe localmente
+  f.novos.forEach(n => { if (!S.d.alunos.some(a => a.id === n.id)) S.d.alunos.push(n); });
+  if (f.lista) f.order.forEach(id => { const a = alunoById(id); if (a && f.marks[id] === true && !a.grupo_id) a.grupo_id = f.g.id; });
+  f.g.com_lista = payload.listaGrupo; if (needP) S.me.assinatura = f.assinP;
+  const rec = { idCliente: idc, aulaId: null, estado: 'por_enviar', erro: '', grupoId: f.g.id, localId: f.local.id, projetoId: f.proj.id, data: f.data, inicio: f.inicio, fim: payload.fim, dur: f.dur, homens: c.h, mulheres: c.m, nomeResp: payload.nomeResp, semAssin: !payload.assinaturaResp, profId: S.me.id,
+    form_estado: 'pendente', post_estado: f.proj.post_publico === 'nao' ? 'na' : semPost ? 'nao_publicar' : 'pendente', formUrl: '', formErro: '', fotosLocal: payload.fotos.slice(), aprovacao: fora ? 'pendente' : '' };
+  S.recent.unshift(rec); S.queue.push({ idCliente: idc, payload });
+  await kv.set('queue', S.queue); await saveRecent();
+  S.flow = null; S.doneId = idc; go('done'); flush(true);
+}
+
+/* ---------- DEPOIS DA AULA ---------- */
+async function markEstado(rec, patch) {
+  Object.assign(rec, patch); await saveRecent();
+  if (rec.aulaId) enqueue('estado', { aulaId: rec.aulaId, patch });
+  render();
+}
+function viewDone() {
+  const rec = S.recent.find(r => r.idCliente === S.doneId); if (!rec) { S.view = 'tab'; return viewHoje(); }
+  const l = localById(rec.localId) || { nome: '' }, el = h('div');
+  const sent = rec.estado === 'enviada';
+  el.append(h('div', { class: 'okmark' }, '✓'), h('h1', { style: 'text-align:center' }, 'Aula guardada'),
+    h('p', { class: 'mut', style: 'text-align:center;margin:0 0 6px' }, `${l.nome} · ${fmtShort(rec.data)} · ${rec.homens} H · ${rec.mulheres} M`),
+    h('div', { style: 'text-align:center;margin-bottom:16px' }, sent ? h('span', { class: 'chip ok' }, IS_GS ? 'Enviada para a Sheet ✓' : 'Guardada neste telemóvel ✓') : rec.estado === 'erro' ? h('span', { class: 'chip bad' }, 'Erro: ' + rec.erro) : h('span', { class: 'chip warn' }, 'Por enviar — segue sozinha quando houver rede')));
+  if (rec.estado === 'erro') el.append(h('button', { class: 'btn bad', style: 'margin-bottom:12px', onclick: () => flush(true) }, 'Tentar enviar outra vez'));
+  if (rec.aprovacao === 'pendente') el.append(h('div', { class: 'hintline' }, 'Fora do período do projeto: a aguardar aprovação do gestor.'));
+  // formulário
+  const fc = h('div', { class: 'card' }, h('b', { style: 'font-size:16.5px' }, '1. Formulário de evidências'));
+  if (rec.form_estado === 'enviado') fc.append(h('div', { style: 'margin-top:8px' }, h('span', { class: 'chip ok' }, 'Formulário enviado ✓')));
+  else {
+    if (!sent) fc.append(h('p', { class: 'mut' }, 'Fica disponível assim que a aula for enviada.'));
+    else if (rec.formUrl) fc.append(h('p', { class: 'mut' }, 'Abre já preenchido. Só falta anexar a foto e carregar em Enviar.'), h('a', { class: 'btn primary', href: rec.formUrl, target: '_blank', rel: 'noopener' }, 'Abrir formulário preenchido'));
+    else fc.append(h('p', { class: 'mut' }, !IS_GS ? 'Na versão ligada ao Google, aqui abre o formulário já preenchido.' : rec.formErro ? `Não consegui preparar o formulário: ${rec.formErro}. Preenche-o à mão.` : 'Este projeto ainda não tem o link do formulário na Sheet. Preenche-o à mão.'));
+    fc.append(h('button', { class: 'btn ghost', style: 'margin-top:10px', onclick: () => markEstado(rec, { form_estado: 'enviado' }) }, 'Já enviei o formulário ✓'));
+  }
+  el.append(fc);
+  // post
+  const pc = h('div', { class: 'card' }, h('b', { style: 'font-size:16.5px' }, '2. Post no Instagram'));
+  if (rec.post_estado === 'na') pc.append(h('p', { class: 'mut' }, 'Este projeto não publica nas redes. A evidência fica só na pasta do projeto.'));
+  else if (rec.post_estado === 'nao_publicar') pc.append(h('p', { class: 'mut' }, 'Sem post: há alunos presentes sem consentimento RGPD assinado.'), h('button', { class: 'btn ghost', onclick: () => markEstado(rec, { post_estado: 'pendente' }) }, 'Afinal quero publicar'));
+  else if (rec.post_estado === 'publicado') pc.append(h('div', { style: 'margin-top:8px' }, h('span', { class: 'chip ok' }, 'Post publicado ✓')));
+  else pc.append(h('p', { class: 'mut' }, 'Foto e legenda já prontas, com as identificações do projeto.'), h('button', { class: 'btn primary', onclick: () => postModal(rec) }, 'Preparar post'),
+    h('button', { class: 'btn ghost', style: 'margin-top:10px', onclick: () => markEstado(rec, { post_estado: 'publicado' }) }, 'Já publiquei ✓'));
+  el.append(pc, h('button', { class: 'btn ghost', style: 'margin-top:6px', onclick: () => go('tab', 'hoje') }, 'Voltar ao início'));
+  return el;
+}
+function buildCaption(proj, loc, data) {
+  const tpl = (proj.legenda_modelo || '').trim() || 'Aula de dança do projeto «{projeto}» – {local}, {data}.\n\n{mencoes}\n\n{hashtags}';
+  return tpl.replace(/\{projeto\}/g, proj.nome).replace(/\{local\}/g, loc.nome).replace(/\{data\}/g, fmtShort(data)).replace(/\{mencoes\}/g, (proj.mencoes || '').trim()).replace(/\{hashtags\}/g, (proj.hashtags || '').trim()).replace(/\n{3,}/g, '\n\n').trim();
+}
+async function bannerFor(projId) {
+  if (S.banners[projId] !== undefined) return S.banners[projId];
+  let b = await kv.get('banner_' + projId, null);
+  if (!b) { try { b = (await API.banner(projId)).banner || ''; if (b) await kv.set('banner_' + projId, b); } catch (e) { b = ''; } }
+  S.banners[projId] = b; return b;
+}
+async function composite(photo, banner) {
+  const load = u => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = u; });
+  const p = await load(photo), b = await load(banner), c = document.createElement('canvas');
+  c.width = p.naturalWidth; c.height = p.naturalHeight; const x = c.getContext('2d'); x.drawImage(p, 0, 0);
+  const bh = Math.round(b.naturalHeight * c.width / b.naturalWidth); x.drawImage(b, 0, c.height - bh, c.width, bh);
+  return c.toDataURL('image/jpeg', .88);
+}
+async function postModal(rec) {
+  const proj = projById(rec.projetoId), loc = localById(rec.localId), raw = rec.fotosLocal && rec.fotosLocal[0];
+  let banner = proj.tem_banner && raw ? await bannerFor(proj.id) : '', useB = !!banner, photo = raw;
+  const img = h('img', { alt: 'Foto do post', style: 'width:100%;max-height:300px;object-fit:contain;border-radius:16px;margin-bottom:8px;background:#000' });
+  const paintImg = async () => { photo = raw && useB && banner ? await composite(raw, banner).catch(() => raw) : raw; if (photo) img.src = photo; };
+  await paintImg();
+  const ta = h('textarea', { class: 'in', rows: '8', style: 'min-height:170px' }); ta.value = rec.legenda || buildCaption(proj, loc, rec.data);
+  ta.addEventListener('input', () => { rec.legenda = ta.value; });
+  const bBtn = banner ? h('button', { class: 'card check' + (useB ? ' on' : ''), style: 'margin-bottom:10px', onclick: async () => { useB = !useB; bBtn.classList.toggle('on', useB); bBtn.querySelector('.box').textContent = useB ? '✓' : ''; await paintImg(); } },
+    h('span', { class: 'box' }, useB ? '✓' : ''), h('b', {}, 'Com o banner do projeto')) : null;
+  const s = openSheet('Post no Instagram',
+    raw ? img : h('p', { class: 'mut' }, 'A foto já não está neste telemóvel. Escolhe-a da galeria no Instagram.'), bBtn,
+    h('label', { class: 'l', style: 'margin-top:0' }, 'Legenda (podes editar)'), ta,
+    h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: async () => toast((await copyText(ta.value)) ? 'Legenda copiada ✓' : 'Não consegui copiar. Seleciona o texto e copia.') }, '1. Copiar legenda'),
+    h('button', { class: 'btn primary', style: 'margin-top:10px', disabled: raw ? null : true, onclick: async () => {
+      try {
+        const file = new File([dataUrlToBlob(photo)], 'aula.jpg', { type: 'image/jpeg' });
+        if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; }
+      } catch (e) { if (e && e.name === 'AbortError') return; }
+      toast('Daqui não dá para partilhar. Mantém o dedo na foto para a guardar e abre o Instagram.');
+    } }, '2. Enviar foto para o Instagram'),
+    h('a', { class: 'btn ghost', style: 'margin-top:10px', href: 'https://www.instagram.com/', target: '_blank', rel: 'noopener' }, 'Abrir o Instagram'),
+    h('p', { class: 'mut cap' }, 'Ao partilhar, escolhe o Instagram, cola a legenda e confirma as identificações. Depois volta aqui e toca em “Já publiquei”.'),
+    h('button', { class: 'btn ok', style: 'margin-top:6px', onclick: async () => { s.close(); await markEstado(rec, { post_estado: 'publicado' }); } }, 'Já publiquei ✓'));
+}
+/* ---------- ALUNOS ---------- */
+function viewAlunos() {
+  const el = h('div'), st = S.al;
+  const list = h('div', { class: 'card', style: 'padding:6px 16px' });
+  const paint = () => {
+    const q = st.q.trim().toLowerCase();
+    const rows = S.d.alunos.filter(a => (!st.localId || a.local_id === st.localId) && (!q || a.nome.toLowerCase().includes(q))).sort(byName);
+    list.replaceChildren(...(rows.length ? rows.map(a => h('button', { class: 'row', style: 'width:100%;background:none;border:0;text-align:left;border-bottom:1px solid var(--line)', onclick: () => alunoModal(a, { onSave: saveAlunoEdit }) },
+      avatar(a), h('div', { class: 'grow' }, h('b', {}, a.nome), h('div', { class: 'mut cap' }, `${a.genero === 'H' ? 'Homem' : a.genero === 'M' ? 'Mulher' : 'Género por indicar'} · ${a.grupo_id ? ((grupoById(a.grupo_id) || {}).nome || 'grupo') : 'sem grupo'}${a.ativo === 'nao' ? ' · inativo' : ''}`))))
+      : [h('p', { class: 'mut' }, 'Nenhum aluno encontrado.')]));
+  };
+  const sel = h('select', { class: 'in', onchange: e => { st.localId = e.target.value; paint(); } }, h('option', { value: '' }, 'Todos os locais'), ...S.d.locais.map(l => h('option', { value: l.id }, l.nome))); sel.value = st.localId;
+  el.append(h('h1', {}, 'Alunos'),
+    h('button', { class: 'btn primary', onclick: () => alunoModal(null, { localId: st.localId, onSave: saveAlunoEdit }) }, '＋ Novo aluno'), h('div', { style: 'height:12px' }), sel, h('div', { style: 'height:8px' }),
+    h('input', { class: 'in', placeholder: 'Procurar por nome', value: st.q, oninput: e => { st.q = e.target.value; paint(); } }), h('div', { style: 'height:12px' }), list);
+  paint(); return el;
+}
+async function saveAlunoEdit(a) {
+  enqueue('aluno', a);
+  const local = Object.assign({}, a); delete local.rgpdAssinatura;
+  const i = S.d.alunos.findIndex(x => x.id === a.id); if (i >= 0) S.d.alunos[i] = Object.assign(S.d.alunos[i], local); else S.d.alunos.push(local);
+  toast('Aluno guardado ✓'); render();
+}
+/* ---------- REGISTOS + FOLHA MENSAL ---------- */
+async function monthData(localId, ym) {
+  let r = { aulas: [], profAssin: {}, feriados: [] };
+  try { r = await API.month(localId, ym); } catch (e) { if (IS_GS && !S.queue.length) throw e; }
+  const aulas = (r.aulas || []).slice(); const have = new Set(aulas.map(a => a.id_cliente).filter(Boolean));
+  S.queue.forEach(q => { const p = q.payload; if (p.localId === localId && p.data.startsWith(ym) && !have.has(p.idCliente)) aulas.push({ id: 'pend-' + p.idCliente, id_cliente: p.idCliente, data: p.data, hora_inicio: p.inicio, hora_fim: p.fim, duracao_min: p.duracaoMin, prof_deu_id: p.profDeuId, homens: p.homens, mulheres: p.mulheres, nome_resp: p.nomeResp, assinaturaResp: p.assinaturaResp, pendente: true }); });
+  const pa = Object.assign({}, r.profAssin || {}); if (S.me.assinatura && !pa[S.me.id]) pa[S.me.id] = S.me.assinatura;
+  return { aulas: aulas.sort((a, b) => (a.data + a.hora_inicio).localeCompare(b.data + b.hora_inicio)), profAssin: pa, feriados: r.feriados || [] };
+}
+function viewRegistos() {
+  const el = h('div'), st = S.reg;
+  if (!st.scope) st.scope = 'local';
+  if (!st.localId) st.localId = (S.d.locais[0] || {}).id || ''; if (!st.projetoId) st.projetoId = (S.d.projetos[0] || {}).id || ''; if (!st.ym) st.ym = today().slice(0, 7);
+  const inScope = () => st.scope === 'local' ? S.d.locais.filter(l => l.id === st.localId) : st.scope === 'projeto' ? S.d.locais.filter(l => l.projeto_id === st.projetoId) : S.d.locais;
+  const scopeLabel = () => st.scope === 'local' ? (localById(st.localId) || {}).nome : st.scope === 'projeto' ? ((projById(st.projetoId) || {}).entidade || (projById(st.projetoId) || {}).nome) : 'Todos os locais';
+  const periodLabel = () => st.all ? 'Todo o período' : `${cap(MESES[Number(st.ym.slice(5)) - 1])} ${st.ym.slice(0, 4)}`;
+  const again = () => render();
+  const seg = h('div', { class: 'seg' }, ...[['local', 'Um local'], ['projeto', 'Uma junta'], ['todos', 'Tudo']].map(([v, l]) => h('button', { class: st.scope === v ? 'on' : '', onclick: () => { st.scope = v; again(); } }, l)));
+  const sel = st.scope === 'local' ? h('select', { class: 'in', onchange: e => { st.localId = e.target.value; again(); } }, ...S.d.locais.map(l => h('option', { value: l.id }, l.nome)))
+    : st.scope === 'projeto' ? h('select', { class: 'in', onchange: e => { st.projetoId = e.target.value; again(); } }, ...S.d.projetos.map(p => h('option', { value: p.id }, p.entidade || p.nome))) : null;
+  if (sel) sel.value = st.scope === 'local' ? st.localId : st.projetoId;
+  const label = h('b', { style: 'flex:1;text-align:center;font-size:16px' }, periodLabel()), list = h('div'), actions = h('div');
+  const shift = k => { const [y, m] = st.ym.split('-').map(Number); const d = new Date(y, m - 1 + k, 1); st.ym = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; again(); };
+  const paint = () => {
+    const tot = { n: 0, h: 0, m: 0 };
+    list.replaceChildren(...st.data.map(e => {
+      e.aulas.forEach(x => { tot.n++; tot.h += Number(x.homens); tot.m += Number(x.mulheres); });
+      const hh = e.aulas.reduce((n, x) => n + Number(x.homens), 0), mm = e.aulas.reduce((n, x) => n + Number(x.mulheres), 0);
+      if (st.all || st.scope !== 'local') return h('div', { class: 'card row' }, h('div', { class: 'grow' }, h('b', {}, e.loc.nome), h('div', { class: 'mut cap' }, `${e.aulas.length} aula(s) · ${hh} H · ${mm} M`)));
+      return e.aulas.length || (e.feriados || []).length ? [...(e.feriados || []).map(f => h('div', { class: 'card row', style: 'margin-bottom:8px' }, h('div', { class: 'grow' }, h('b', {}, `${DIAS[dow(f.data)]} ${fmtShort(f.data)} · ${f.tipo === 'feriado' ? 'feriado' : 'sem aula'}`), h('div', { class: 'mut cap' }, (f.tipo === 'feriado' ? '' : (f.motivo || '') + ' · ') + 'consta na folha, sem assinaturas')))), ...e.aulas.map(x => h('button', { class: 'card row', style: 'margin-bottom:8px;width:100%;text-align:left', onclick: () => x.pendente ? toast('Esta aula ainda não seguiu para o servidor.') : aulaModal(x, () => render()) }, h('div', { class: 'grow' }, h('b', {}, `${DIAS[dow(x.data)]} ${fmtShort(x.data)} · ${x.hora_inicio}`), h('div', { class: 'mut cap' }, `${(profById(x.prof_deu_id) || {}).nome || ''}${x.nome_resp ? ' · assinou ' + x.nome_resp : x.pendente ? '' : ' · por assinar'}`)),
+        h('div', { style: 'text-align:right' }, h('b', {}, Number(x.homens) + Number(x.mulheres)), h('div', { class: 'mut cap' }, `${x.homens} H · ${x.mulheres} M`)), x.pendente ? h('span', { class: 'chip warn' }, 'por enviar') : null))] : h('div', { class: 'card mut' }, 'Sem aulas neste período.');
+    }));
+    actions.replaceChildren(h('p', { class: 'mut' }, `${tot.n} aula(s) · ${tot.h} homens · ${tot.m} mulheres`), h('button', { class: 'btn primary', disabled: tot.n || st.scope === 'local' || st.data.some(e => (e.feriados || []).length) ? null : true, onclick: folhaPreview }, 'Ver folhas de presença'));
+  };
+  async function load() {
+    list.replaceChildren(h('p', { class: 'mut' }, 'A carregar…'));
+    try { st.data = await Promise.all(inScope().map(async l => Object.assign({ loc: l }, await monthData(l.id, st.all ? '' : st.ym)))); } catch (e) { list.replaceChildren(h('div', { class: 'card' }, 'Não consegui carregar: ' + e.message)); return; } paint();
+  }
+  function folhaPreview() {
+    const pages = [];
+    st.data.forEach(e => {
+      const by = {}, fer = {}; e.aulas.forEach(a => { (by[a.data.slice(0, 7)] = by[a.data.slice(0, 7)] || []).push(a); }); (e.feriados || []).forEach(f => { const k = String(f.data).slice(0, 7); (fer[k] = fer[k] || []).push(f); by[k] = by[k] || []; });
+      let months = Object.keys(by).sort(); if (!months.length && !st.all && st.scope === 'local') months = [st.ym];
+      months.forEach(m => pages.push(sheetHtml({ proj: projById(e.loc.projeto_id), loc: e.loc, ym: m, aulas: by[m] || [], feriados: fer[m] || [], profAssin: e.profAssin })));
+    });
+    if (!pages.length) { toast('Sem aulas para mostrar.'); return; }
+    const body = pages.join('<div style="page-break-after:always;height:14px;border-bottom:2px dashed #ddd;margin-bottom:14px"></div>');
+    const nome = `Registo de aulas - ${scopeLabel()} - ${st.all ? 'todo o periodo' : st.ym}`;
+    const s = openSheet('Folhas de presença', h('p', { class: 'mut cap', style: 'margin-top:0' }, `${pages.length} folha(s) · ${scopeLabel()} · ${periodLabel()}`), h('div', { class: 'sheetscroll' }, h('div', { html: body })),
+      h('p', { class: 'mut cap' }, 'Pré-visualização. Mantém-se também a folha em papel durante o piloto.'),
+      h('button', { class: 'btn primary', onclick: async e => {
+        e.currentTarget.disabled = true;
+        try { const r = await API.savePdf(`<html><head><meta charset="utf-8"></head><body style="margin:0;padding:8mm">${body}</body></html>`, nome); s.close(); toast(r.demo ? 'No modo real, o PDF fica guardado no Drive.' : 'PDF guardado no Drive ✓'); if (r.url) openSheet('PDF guardado', h('a', { class: 'btn primary', href: r.url, target: '_blank', rel: 'noopener' }, 'Abrir o PDF')); } catch (err) { toast('Não consegui guardar o PDF: ' + err.message); e.currentTarget.disabled = false; }
+      } }, IS_GS ? 'Guardar PDF único no Drive' : 'Guardar PDF (só na versão ligada)'));
+  }
+  el.append(h('h1', {}, 'Registos'), seg, h('div', { style: 'height:10px' }), sel, h('div', { style: 'height:6px' }),
+    h('div', { class: 'row-between', style: 'margin:10px 0' }, st.all ? null : h('button', { class: 'btn ghost small', 'aria-label': 'Mês anterior', onclick: () => shift(-1) }, '‹'), label, st.all ? null : h('button', { class: 'btn ghost small', 'aria-label': 'Mês seguinte', onclick: () => shift(1) }, '›')),
+    h('div', { class: 'tools', style: 'margin:-4px 0 12px' }, h('button', { class: 'pill' + (st.all ? ' on' : ''), onclick: () => { st.all = !st.all; again(); } }, 'Todo o período')), list, actions,
+    st.all ? null : pagamentosCard(st.ym));
+  load(); return el;
+}
+function podeEditar(x) { return isGestor() || (x.prof_deu_id === S.me.id && x.data.slice(0, 7) === today().slice(0, 7)); }
+async function aulaModal(x, reload) {
+  const l = localById(x.local_id) || {}, g = grupoById(x.grupo_id) || {}, can = podeEditar(x);
+  const head = h('p', { class: 'mut', style: 'margin-top:0' }, `${l.nome} · ${DIAS[dow(x.data)]} ${fmtShort(x.data)} · ${(profById(x.prof_deu_id) || {}).nome || ''}`);
+  if (!can) { openSheet('Aula', head, h('div', { class: 'card' }, `${x.hora_inicio}–${x.hora_fim} · ${durTxt(x.duracao_min)} · ${x.homens} H · ${x.mulheres} M`), h('p', { class: 'mut cap' }, x.prof_deu_id === S.me.id ? 'Já não podes corrigir esta aula: o prazo é o fim do mês em que foi dada. Fala com o gestor.' : 'Só o professor que deu a aula (até ao fim do mês) ou o gestor podem corrigir.')); return; }
+  let pres = null;
+  if (g.com_lista === 'sim') { try { pres = (await API.presencas(x.id)).presencas; if (!pres.length) pres = null; } catch (e) { toast('Sem ligação: só consigo corrigir horário e totais.'); } }
+  const st = { inicio: x.hora_inicio, dur: Number(x.duracao_min) || 60, h: Number(x.homens), m: Number(x.mulheres) };
+  const timeIn = h('input', { class: 'in', type: 'time', value: st.inicio, style: 'width:auto' });
+  const durIn = h('input', { class: 'in', type: 'number', min: '15', step: '15', value: st.dur, style: 'width:110px' });
+  const num = (v, k) => h('input', { class: 'in', type: 'number', min: '0', value: v, style: 'width:90px', oninput: e => { st[k] = Number(e.target.value) || 0; } });
+  const obs = h('textarea', { class: 'in', style: 'min-height:70px' }); obs.value = x.observacoes || '';
+  const presBox = h('div', { class: 'namechips' });
+  const paintPres = () => presBox.replaceChildren(...pres.map(p => h('button', { class: 'namechip', style: p.presente ? 'background:var(--ok-l);color:var(--ok)' : 'background:var(--bad-l);color:var(--bad)', onclick: () => { p.presente = !p.presente; paintPres(); } }, (p.presente ? '✓ ' : '✗ ') + (p.nome || (alunoById(p.alunoId) || {}).nome || p.alunoId))));
+  if (pres) paintPres();
+  const s = openSheet('Corrigir aula', head,
+    h('label', { class: 'l', style: 'margin-top:0' }, 'Hora de início'), timeIn, h('label', { class: 'l' }, 'Duração (minutos)'), durIn,
+    pres ? [h('label', { class: 'l' }, 'Presenças (toca para mudar)'), presBox] : [h('label', { class: 'l' }, 'Homens · Mulheres'), h('div', { style: 'display:flex;gap:10px' }, num(st.h, 'h'), num(st.m, 'm'))],
+    h('label', { class: 'l' }, 'Observações'), obs,
+    h('button', { class: 'btn primary', style: 'margin-top:16px', onclick: async () => {
+      const patch = { inicio: timeIn.value || st.inicio, duracaoMin: Number(durIn.value) || st.dur, observacoes: obs.value.trim() };
+      if (pres) patch.presencas = pres.map(p => ({ alunoId: p.alunoId, presente: !!p.presente })); else { patch.homens = st.h; patch.mulheres = st.m; }
+      try { await API.editAula(x.id, patch); } catch (e) { toast(e.server ? e.message : 'Sem ligação. Corrigir aulas precisa de rede.'); return; }
+      s.close(); toast('Aula corrigida ✓'); reload();
+    } }, 'Guardar correção'),
+    h('button', { class: 'btn bad', style: 'margin-top:10px', onclick: async () => {
+      const motivo = h('textarea', { class: 'in', placeholder: 'Motivo (ex.: registo duplicado)' });
+      const c = openSheet('Anular aula', h('p', { class: 'mut', style: 'margin-top:0' }, 'A aula sai das folhas e dos pagamentos. Fica registado quem anulou e porquê.'), motivo,
+        h('button', { class: 'btn bad', style: 'margin-top:12px', onclick: async () => {
+          if (motivo.value.trim().length < 3) { toast('Escreve o motivo.'); return; }
+          try { await API.anularAula(x.id, motivo.value.trim()); } catch (e) { toast(e.server ? e.message : 'Sem ligação. Anular precisa de rede.'); return; }
+          const a = S.d.aulas.find(z => z.id === x.id); if (a) a.estado = 'anulada';
+          S.recent.forEach(r => { if (r.aulaId === x.id) r.estado = 'anulada'; }); await saveRecent();
+          c.close(); s.close(); toast('Aula anulada'); reload();
+        } }, 'Anular aula'));
+    } }, 'Anular esta aula'));
+}
+function pagamentosCard(ym) {
+  const box = h('div', { class: 'card', style: 'margin-top:14px' }, h('b', { style: 'font-size:16.5px' }, isGestor() ? 'Pagamentos do mês' : 'O meu pagamento do mês'), h('p', { class: 'mut' }, 'A carregar…'));
+  const load = async () => {
+    let r; try { r = await API.pagamentos(ym); } catch (e) { box.replaceChildren(h('b', {}, 'Pagamentos'), h('p', { class: 'mut' }, 'Sem ligação.')); return; }
+    const list = r.pagamentos || [];
+    box.replaceChildren(h('div', { class: 'row-between' }, h('b', { style: 'font-size:16.5px' }, isGestor() ? 'Pagamentos do mês' : 'O meu pagamento do mês'), h('span', { class: 'mut cap' }, 'aulas válidas')),
+      ...(list.length ? list.map(p => h('details', { class: 'row', style: 'display:block' }, h('summary', { style: 'display:flex;justify-content:space-between;gap:8px;cursor:pointer;font-weight:700' }, h('span', {}, p.nome), h('span', {}, `${p.aulas.length} × ${p.valor} € = ${p.total} €`)),
+        ...p.aulas.map(a => h('div', { class: 'mut cap', style: 'padding:3px 0' }, `${fmtShort(a.data)} · ${a.hora_inicio}–${a.hora_fim} · ${durTxt(a.duracao_min)} · ${a.local}`))))
+        : [h('p', { class: 'mut' }, 'Sem valores a pagar neste mês.')]),
+      isGestor() ? h('details', { style: 'margin-top:10px' }, h('summary', { style: 'font-weight:700;padding:6px 0' }, 'Valor por aula de cada professor'),
+        ...S.d.professores.filter(p => p.valor_aula !== undefined).map(p => { const inp = h('input', { class: 'in', type: 'number', min: '0', step: '0.5', value: p.valor_aula, style: 'width:100px' }); return h('div', { class: 'row' }, h('div', { class: 'grow' }, p.nome), inp, h('span', {}, '€'), h('button', { class: 'btn small ghost', onclick: async () => { try { await API.setValor(p.id, inp.value); p.valor_aula = Number(inp.value) || 0; toast('Valor guardado ✓'); load(); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); } } }, 'Guardar')); })) : null,
+      isGestor() ? h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: async e => {
+        e.currentTarget.disabled = true;
+        try {
+          const g = await API.gerarRelatorios(ym);
+          if (g.demo) { toast('Na versão ligada, os PDFs ficam no Drive e são enviados por email no dia 3.'); return; }
+          openSheet('Relatórios gerados', h('a', { class: 'btn primary', href: g.resumoUrl, target: '_blank', rel: 'noopener', style: 'margin-bottom:10px' }, 'Resumo de todas as aulas'), ...g.pagamentos.map(x => h('a', { class: 'btn ghost', href: x.url, target: '_blank', rel: 'noopener', style: 'margin-bottom:8px' }, `Pagamento · ${x.nome} · ${x.total} €`)));
+        } catch (err) { toast(err.server ? err.message : 'Sem ligação.'); } finally { e.currentTarget && (e.currentTarget.disabled = false); }
+      } }, 'Gerar PDFs: resumo e pagamentos') : null,
+      isGestor() ? h('p', { class: 'mut cap' }, 'Gerados também automaticamente no dia 3 de cada mês, com email para os gestores.') : null);
+  };
+  load(); return box;
+}
+function sheetHtml(c) {
+  const O = '#F1592A', mes = `${MESES[Number(c.ym.slice(5, 7)) - 1].toUpperCase()} - ${c.ym.slice(0, 4)}`;
+  const th = (t, x) => `<th style="background:${O};color:#fff;border:1px solid #000;padding:3px 4px;font-size:10px;font-weight:700;${x || ''}">${t}</th>`;
+  const td = (t, x) => `<td style="border:1px solid #000;padding:2px 4px;font-size:11px;text-align:center;vertical-align:middle;${x || ''}">${t}</td>`;
+  const img = u => u ? `<img src="${u}" style="height:30px;max-width:110px">` : '';
+  const entries = c.aulas.map(a => {
+    const p = profById(a.prof_deu_id), hh = Number(a.homens), mm = Number(a.mulheres);
+    return { k: a.data + a.hora_inicio, h: `<tr style="height:42px">${td(esc(c.loc.nome))}${td(fmtShort(a.data))}${td(esc(p ? p.nome : ''))}${td(esc(a.hora_inicio))}${td(esc(a.hora_fim))}${td(durTxt(a.duracao_min))}${td(hh)}${td(mm)}${td(hh + mm)}${td(img(a.assinaturaProf || c.profAssin[a.prof_deu_id]))}${td(img(a.assinaturaResp) + (a.nome_resp ? `<div style="font-size:8px">${esc(a.nome_resp)}</div>` : ''))}</tr>` };
+  });
+  (c.feriados || []).forEach(f => { const p = profById(f.professor_id); entries.push({ k: f.data + (f.hora_inicio || ''), h: `<tr style="height:42px;background:#f6f6f6">${td(esc(c.loc.nome))}${td(fmtShort(f.data))}${td(esc(p ? p.nome : ''))}${td(esc(f.hora_inicio || ''))}${td(esc(f.hora_fim || ''))}${td(f.duracao_min ? durTxt(f.duracao_min) : '')}<td colspan="5" style="border:1px solid #000;text-align:center;font-size:11px;font-weight:700">${f.tipo === 'feriado' ? 'FERIADO - sem aula' : 'SEM AULA - ' + esc(f.motivo || '')}</td></tr>` }); });
+  entries.sort((a, b) => a.k.localeCompare(b.k));
+  const rows = entries.map(e => e.h);
+  while (rows.length < 7) rows.push(`<tr style="height:42px">${Array(11).fill(td('&nbsp;')).join('')}</tr>`);
+  const obs = c.aulas.filter(a => a.observacoes).map(a => `${fmtShort(a.data)}: ${esc(a.observacoes)}`).concat((c.feriados || []).map(f => `${fmtShort(f.data)}: ${esc(f.tipo === 'feriado' ? 'Feriado' : (f.motivo || 'Sem aula'))}`)).join(' · ');
+  return `<div style="font-family:Arial,Helvetica,sans-serif;color:#000;width:100%">
+<table style="width:100%;border-collapse:collapse;margin-bottom:10px"><tr>
+<td style="width:20%;vertical-align:middle"><img src="${LOGO}" style="height:56px"></td>
+<td style="text-align:center;vertical-align:middle"><div style="font-size:10px;font-weight:700">REGISTO DE AULAS</div><div style="font-size:20px;font-weight:700">${esc(c.proj.folha_programa || c.proj.programa || '')}</div><div style="font-size:10px;font-weight:700">${esc(c.proj.folha_entidade || c.proj.entidade || '')}</div><div style="font-size:9px;font-weight:700">"${esc(c.proj.folha_projeto || c.proj.nome)}"</div></td>
+<td style="width:24%;text-align:right;vertical-align:top"><span style="display:inline-block;border:2px solid #000;padding:6px 12px;font-size:15px;font-weight:700">${mes}</span></td></tr></table>
+<table style="width:100%;border-collapse:collapse;table-layout:fixed">
+<tr>${th('Local', 'width:12%" rowspan="2')}${th('Data', 'width:9%" rowspan="2')}${th('Professor', 'width:12%" rowspan="2')}${th('Horário', '" colspan="3')}${th('Nº Participantes', '" colspan="3')}${th('Assinaturas', '" colspan="2')}</tr>
+<tr>${th('Início')}${th('Fim')}${th('Total')}${th('Homens')}${th('Mulheres')}${th('Total')}${th('Professor')}${th('Representante do Local')}</tr>
+${rows.join('')}</table>
+<div style="border-top:3px solid #000;margin-top:12px;padding-top:4px;font-size:11px;font-weight:700">OBSERVAÇÕES: <span style="font-weight:400">${obs}</span></div></div>`;
+}
+
+/* =====================================================================
+   ARRANQUE
+   ===================================================================== */
+let lastBoot = 0, listening = false;
+function applyBoot(r) {
+  S.d = { projetos: r.projetos || [], locais: r.locais || [], grupos: r.grupos || [], professores: r.professores || [], alunos: r.alunos || [], atrib: r.atrib || [], semAulas: r.semAulas || [], aulas: r.aulas || [], aprovacoes: r.aprovacoes || [] };
+  S.me = r.me ? Object.assign({}, S.d.professores.find(p => p.id === r.me.id) || {}, r.me) : null;
+  lastBoot = Date.now();
+}
+async function refreshData(force) {
+  if (!S.d || S.flow || !navigator.onLine || (!force && Date.now() - lastBoot < 60000)) return;
+  try { applyBoot(await API.boot()); if (!document.querySelector('.ov, .staff') && S.view !== 'flow') render(); } catch (e) { }
+}
+async function main() {
+  S.collapse = await kv.get('collapse', {}); S.queue = await kv.get('queue', []); S.recent = await kv.get('recent', []);
+  if (IS_GS) { TOKEN = await kv.get('token', ''); if (!TOKEN) { renderLogin(); return; } }
+  const app = $('#app');
+  const cached = IS_GS ? await kv.get('boot', null) : null;
+  if (!cached) app.replaceChildren(h('div', { style: 'padding:40px 20px;text-align:center' }, h('b', {}, 'A abrir…')));
+  let r;
+  try { r = await API.boot(); if (IS_GS) await kv.set('boot', r); }
+  catch (e) {
+    if (e.auth) return;
+    if (cached) { r = cached; toast('Sem rede: a usar os dados guardados neste telemóvel.'); }
+    else { app.replaceChildren(h('div', { style: 'padding:30px 20px' }, h('h1', {}, 'Não consegui abrir'), h('p', { class: 'mut' }, (e && e.message) || String(e)), h('p', { class: 'mut' }, 'Confirma que tens rede e tenta outra vez.'), h('button', { class: 'btn primary', onclick: () => location.reload() }, 'Tentar outra vez'))); return; }
+  }
+  applyBoot(r);
+  render(); flush();
+  if (!listening) {
+    listening = true;
+    window.addEventListener('online', () => { chip(); flush(true); refreshData(true); }); window.addEventListener('offline', chip);
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { flush(); refreshData(); } });
+  }
+}
+if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
+main();
+</script>
+</body>
+</html>
