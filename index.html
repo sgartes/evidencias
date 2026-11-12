@@ -124,7 +124,7 @@ const CFG = window.SGA_CONFIG || {};
 const IS_GS = !!CFG.API_URL;
 let TOKEN = '';
 const LOGO = 'data:image/png;base64,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';
-const VERSION = 'versão 2.0';
+const VERSION = 'versão 2.1';
 
 /* ---------- utilidades ---------- */
 const $ = (s, el = document) => el.querySelector(s);
@@ -446,6 +446,12 @@ const API = {
   },
   async gerarRelatorios(ym) { if (IS_GS) return gs('apiGerarRelatorios', ym); return { ok: true, demo: true, resumoUrl: '', pagamentos: [] }; },
   async banner(pid) { if (IS_GS) return gs('apiBanner', pid); return { ok: true, banner: demoBanner() }; },
+  async adminSave(tabela, obj) {
+    if (IS_GS) return gs('apiAdminSave', tabela, obj);
+    const arr = DEMO[{ Projetos: 'projetos', Locais: 'locais', Grupos: 'grupos', Professores: 'professores' }[tabela]];
+    let it = obj.id && arr.find(x => x.id === obj.id); if (!it) { it = { id: tabela[0] + '-' + Date.now().toString(36) }; arr.push(it); }
+    Object.assign(it, obj, { id: it.id }); await kv.set('demo', DEMO); return { ok: true, id: it.id };
+  },
   async logout() { if (IS_GS) { try { await gs('apiLogout'); } catch (e) { } } },
   async reset() { await kv.del('demo'); await kv.del('queue'); await kv.del('recent'); await kv.del('profile'); }
 };
@@ -541,7 +547,7 @@ function render() {
   if (!S.me) { main.append(viewQuem()); chip(); return; }
   if (S.view === 'flow') main.append(viewFlow());
   else if (S.view === 'done') main.append(viewDone());
-  else { main.append(S.tab === 'hoje' ? viewHoje() : S.tab === 'pend' ? viewPend() : S.tab === 'alunos' ? viewAlunos() : viewRegistos()); app.append(nav()); }
+  else { main.append(S.tab === 'hoje' ? viewHoje() : S.tab === 'pend' ? viewPend() : S.tab === 'alunos' ? viewAlunos() : S.tab === 'gestao' && isGestor() ? viewGestao() : viewRegistos()); app.append(nav()); }
   chip();
 }
 function topbar() {
@@ -551,7 +557,7 @@ function topbar() {
 }
 function nav() {
   const t = (id, ico, label, n) => h('button', { class: S.tab === id ? 'on' : '', style: 'position:relative', onclick: () => go('tab', id) }, h('span', { style: 'font-size:20px' }, ico), label, n ? h('span', { style: 'position:absolute;top:2px;right:calc(50% - 26px);background:var(--brand);color:#fff;border-radius:999px;font-size:10px;font-weight:800;min-width:17px;height:17px;display:grid;place-items:center;padding:0 4px' }, n > 99 ? '99+' : n) : null);
-  return h('div', { class: 'nav' }, h('div', { class: 'nav-in' }, t('hoje', '📅', 'Hoje'), t('pend', '🗂️', 'Pendentes', lateItems().length + signItems().length + (isGestor() ? (S.d.aprovacoes || []).length : 0)), t('alunos', '👥', 'Alunos'), t('registos', '📄', 'Registos')));
+  return h('div', { class: 'nav' }, h('div', { class: 'nav-in' }, t('hoje', '📅', 'Hoje'), t('pend', '🗂️', 'Pendentes', lateItems().length + signItems().length + (isGestor() ? (S.d.aprovacoes || []).length : 0)), t('alunos', '👥', 'Alunos'), t('registos', '📄', 'Registos'), isGestor() ? t('gestao', '⚙️', 'Gestão') : null));
 }
 function viewQuem() {
   return h('div', {}, h('h1', {}, 'Quem és tu?'), ...S.d.professores.map(p => h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: async () => { await kv.set('profile', p.id); location.reload(); } }, p.nome)));
@@ -1221,6 +1227,98 @@ async function postModal(rec) {
     h('button', { class: 'btn ok', style: 'margin-top:6px', onclick: async () => { s.close(); await markEstado(rec, { post_estado: 'publicado' }); } }, 'Já publiquei ✓'));
 }
 /* ---------- ALUNOS ---------- */
+
+/* =====================================================================
+   GESTÃO (só gestor): projetos, locais, turmas e professores
+   ===================================================================== */
+const DIAS_LONGOS = ['', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
+const SIMNAO = () => [['sim', 'Sim'], ['nao', 'Não']];
+const GE = {
+  locais: {
+    tab: 'Locais', titulo: 'Locais', novo: 'Novo local',
+    items: () => S.d.locais, nome: l => l.nome, sub: l => (projById(l.projeto_id) || {}).nome || '',
+    fields: () => [
+      { k: 'projeto_id', l: 'Projeto', type: 'select', opts: () => S.d.projetos.map(p => [p.id, p.nome]) },
+      { k: 'nome', l: 'Nome do local' }, { k: 'morada', l: 'Morada' },
+      { k: 'responsaveis', l: 'Responsáveis do local', help: 'Quem assina as presenças. Separa os nomes com ponto e vírgula (;).' },
+      { k: 'nome_no_formulario', l: 'Nome no formulário', help: 'Só se o formulário da entidade usar um nome diferente.' }]
+  },
+  grupos: {
+    tab: 'Grupos', titulo: 'Turmas', novo: 'Nova turma',
+    items: () => S.d.grupos.slice().sort((a, b) => ((localById(a.local_id) || {}).nome || '').localeCompare((localById(b.local_id) || {}).nome || '') || Number(a.dia) - Number(b.dia) || String(a.hora_inicio).localeCompare(String(b.hora_inicio))),
+    nome: g => g.nome + (g.ativo === 'nao' ? ' · inativa' : ''), sub: g => `${(localById(g.local_id) || {}).nome || ''} · ${DIAS[Number(g.dia)] || '?'} ${g.hora_inicio} · ${(profById(g.professor_id) || {}).nome || 'sem professor'}`,
+    inactive: g => g.ativo === 'nao',
+    fields: () => [
+      { k: 'local_id', l: 'Local', type: 'select', opts: () => S.d.locais.map(l => [l.id, `${l.nome} (${((projById(l.projeto_id) || {}).nome || '').slice(0, 28)})`]) },
+      { k: 'nome', l: 'Nome da turma' },
+      { k: 'professor_id', l: 'Professor responsável', type: 'select', opts: () => S.d.professores.map(p => [p.id, p.nome]) },
+      { k: 'dia', l: 'Dia da semana', type: 'select', opts: () => DIAS_LONGOS.map((d, i) => [String(i), d]).slice(1), def: '1' },
+      { k: 'hora_inicio', l: 'Hora de início', type: 'time' },
+      { k: 'duracao_min', l: 'Duração (minutos)', type: 'number', def: '60' },
+      { k: 'com_lista', l: 'Chamada com lista de alunos?', type: 'select', opts: SIMNAO, def: 'nao', help: 'Não = só se contam homens e mulheres.' },
+      { k: 'ativo', l: 'Turma ativa?', type: 'select', opts: SIMNAO, def: 'sim', help: 'Turmas inativas deixam de aparecer no ecrã Hoje.' }]
+  },
+  professores: {
+    tab: 'Professores', titulo: 'Professores', novo: 'Novo professor',
+    items: () => (S.d.gestao ? S.d.gestao.professores : S.d.professores),
+    nome: p => p.nome + (p.ativo === 'nao' ? ' · inativo' : '') + (p.papel === 'gestor' ? ' · gestor' : ''), sub: p => p.email || 'sem email: ainda não pode entrar',
+    inactive: p => p.ativo === 'nao',
+    fields: () => [
+      { k: 'nome', l: 'Nome' },
+      { k: 'email', l: 'Email Google', type: 'email', help: 'A pessoa entra com a conta Google com este email.' },
+      { k: 'papel', l: 'Função', type: 'select', opts: () => [['professor', 'Professor'], ['gestor', 'Gestor']], def: 'professor' },
+      { k: 'valor_aula', l: 'Valor por aula (€)', type: 'number', help: 'Vazio = valor padrão.' },
+      { k: 'ativo', l: 'Ativo?', type: 'select', opts: SIMNAO, def: 'sim', help: 'Inativo: deixa de poder entrar. Não se apaga nada.' }]
+  },
+  projetos: {
+    tab: 'Projetos', titulo: 'Projetos', novo: 'Novo projeto',
+    items: () => S.d.projetos, nome: p => p.nome, sub: p => [p.entidade, p.data_inicio && p.data_fim ? `${p.data_inicio} → ${p.data_fim}` : 'sem datas'].filter(Boolean).join(' · '),
+    fields: () => [
+      { k: 'nome', l: 'Nome do projeto' }, { k: 'programa', l: 'Programa' }, { k: 'entidade', l: 'Entidade financiadora' },
+      { k: 'data_inicio', l: 'Início do período', type: 'date' }, { k: 'data_fim', l: 'Fim do período', type: 'date', help: 'Aulas fora destas datas ficam a aguardar a tua aprovação.' },
+      { k: 'formulario_url', l: 'Link do formulário (https://…)', type: 'url' },
+      { k: 'entidade_email', l: 'Email da entidade', type: 'email', help: 'Recebe um aviso quando um professor regista uma aula não prevista. Vazio = não envia nada.' },
+      { k: 'post_publico', l: 'Publicações públicas nas redes?', type: 'select', opts: SIMNAO, def: 'nao', help: 'Para projetos com crianças, deixa em Não.' },
+      { k: 'mencoes', l: 'Menções (@…)' }, { k: 'hashtags', l: 'Hashtags (#…)' },
+      { k: 'folha_programa', l: 'Folha de presenças: programa' }, { k: 'folha_entidade', l: 'Folha de presenças: entidade' }, { k: 'folha_projeto', l: 'Folha de presenças: projeto' },
+      { k: 'legenda_modelo', l: 'Legenda modelo', type: 'area' }]
+  }
+};
+async function reloadAll() { const r = await API.boot(); if (IS_GS) await kv.set('boot', r); applyBoot(r); render(); }
+function geForm(sec, it) {
+  const spec = GE[sec], inputs = {}, err = h('p', { style: 'color:#c0392b;font-weight:700;margin:12px 0 0' });
+  const cur = it || {};
+  const body = spec.fields().map(f => {
+    let el;
+    if (f.type === 'select') { el = h('select', { class: 'in' }, ...f.opts().map(([v, l]) => h('option', { value: v }, l))); el.value = String(cur[f.k] !== undefined && cur[f.k] !== '' ? cur[f.k] : (f.def !== undefined ? f.def : (f.opts()[0] || [''])[0])); }
+    else if (f.type === 'area') { el = h('textarea', { class: 'in' }); el.value = cur[f.k] || ''; }
+    else { el = h('input', { class: 'in', type: f.type || 'text', step: f.type === 'number' ? 'any' : null }); el.value = cur[f.k] !== undefined && cur[f.k] !== '' ? cur[f.k] : (f.def || ''); }
+    inputs[f.k] = el;
+    return [h('label', { class: 'l' }, f.l), el, f.help ? h('p', { class: 'mut cap', style: 'margin:6px 0 0' }, f.help) : null];
+  });
+  const save = h('button', { class: 'btn primary', style: 'margin-top:18px', onclick: async () => {
+    const obj = it ? { id: it.id } : {}; spec.fields().forEach(f => { obj[f.k] = inputs[f.k].value; });
+    save.disabled = true; save.textContent = 'A guardar…'; err.textContent = '';
+    try { await API.adminSave(spec.tab, obj); s.close(); toast('Guardado ✓'); await reloadAll(); }
+    catch (e) { err.textContent = e.server ? e.message : 'Sem ligação ao servidor. Tenta outra vez.'; save.disabled = false; save.textContent = 'Guardar'; }
+  } }, 'Guardar');
+  const s = openSheet(it ? 'Editar' : spec.novo, ...body, err, save);
+}
+function viewGestao() {
+  const st = S.ge = S.ge || { sec: 'locais' }, spec = GE[st.sec];
+  const el = h('div');
+  el.append(h('h1', {}, 'Gestão'),
+    h('div', { class: 'seg', style: 'flex-wrap:wrap;margin-bottom:14px' }, ...Object.keys(GE).map(k => h('button', { class: st.sec === k ? 'on' : '', style: 'min-width:46%;min-height:46px', onclick: () => { st.sec = k; render(); } }, GE[k].titulo))),
+    h('button', { class: 'btn primary', style: 'margin-bottom:14px', onclick: () => geForm(st.sec, null) }, '+ ' + spec.novo));
+  const items = spec.items();
+  if (!items.length) el.append(h('p', { class: 'mut' }, 'Ainda não há nada aqui.'));
+  items.forEach(it => el.append(h('div', { class: 'card row', style: spec.inactive && spec.inactive(it) ? 'opacity:.6' : '' },
+    h('div', { class: 'grow' }, h('b', {}, spec.nome(it)), h('div', { class: 'mut cap' }, spec.sub(it))),
+    h('button', { class: 'btn small ghost', onclick: () => geForm(st.sec, it) }, 'Editar'))));
+  el.append(h('p', { class: 'mut cap', style: 'margin-top:16px' }, 'Nada é apagado: para retirar uma turma ou um professor, marca-o como inativo.'));
+  return el;
+}
+
 function viewAlunos() {
   const el = h('div'), st = S.al;
   const list = h('div', { class: 'card', style: 'padding:6px 16px' });
@@ -1395,7 +1493,7 @@ ${rows.join('')}</table>
    ===================================================================== */
 let lastBoot = 0, listening = false;
 function applyBoot(r) {
-  S.d = { projetos: r.projetos || [], locais: r.locais || [], grupos: r.grupos || [], professores: r.professores || [], alunos: r.alunos || [], atrib: r.atrib || [], semAulas: r.semAulas || [], aulas: r.aulas || [], aprovacoes: r.aprovacoes || [] };
+  S.d = { projetos: r.projetos || [], locais: r.locais || [], grupos: r.grupos || [], professores: r.professores || [], alunos: r.alunos || [], atrib: r.atrib || [], semAulas: r.semAulas || [], aulas: r.aulas || [], aprovacoes: r.aprovacoes || [], gestao: r.gestao || null };
   S.me = r.me ? Object.assign({}, S.d.professores.find(p => p.id === r.me.id) || {}, r.me) : null;
   lastBoot = Date.now();
 }
