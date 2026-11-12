@@ -98,7 +98,7 @@ label.l{display:block;font-weight:700;margin:16px 0 8px}
 .sheet{background:var(--bg);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:32px 32px 0 0;padding:18px 18px calc(20px + env(safe-area-inset-bottom))}
 .sheet-h{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;font-size:18px}
 .toast{position:fixed;left:50%;bottom:104px;transform:translateX(-50%);background:#2b2320;color:#fff;padding:13px 20px;border-radius:18px;z-index:40;max-width:92%;font-size:16px;text-align:center;box-shadow:0 10px 30px #0004}
-.sheetscroll{overflow:auto;border-radius:16px;background:#fff;padding:10px;box-shadow:var(--sh)}
+.sheetscroll{overflow:auto;border-radius:16px;background:#fff;padding:10px;box-shadow:var(--sh)}@media print{body.np>*{display:none!important}}
 .sheetscroll>div{min-width:860px}
 .staff{position:fixed;inset:0;background:var(--bg);z-index:30;overflow:auto}
 .staff-in{max-width:560px;margin:0 auto;padding:24px 18px calc(24px + env(safe-area-inset-bottom))}
@@ -360,7 +360,7 @@ const API = {
     if (IS_GS) return gs('apiSaveAula', p);
     const db = DEMO; const ex = db.aulas.find(a => a.id_cliente === p.idCliente); if (ex) return { ok: true, aulaId: ex.id, formUrl: '', aprovacao: ex.aprovacao };
     const id = 'AU-' + Date.now().toString(36), me = db.professores.find(x => x.id === (S.me || {}).id) || db.professores[0];
-    (p.novosAlunos || []).forEach(n => { if (!db.alunos.some(a => a.id === n.id)) { const o = Object.assign({}, n, { ativo: 'sim' }); if (o.rgpdAssinatura) { o.rgpd_estado = 'assinado'; o.rgpd_data = today(); } delete o.rgpdAssinatura; db.alunos.push(o); } });
+    (p.novosAlunos || []).forEach(n => { if (!db.alunos.some(a => a.id === n.id)) { const o = Object.assign({}, n, { ativo: 'sim' }); if (o.rgpdAssinatura) { o.rgpd_estado = o.rgpdModo === 'testemunha' ? 'testemunhado' : 'assinado'; o.rgpd_data = today(); } delete o.rgpdAssinatura; db.alunos.push(o); } });
     (p.presencas || []).filter(x => x.presente).forEach(x => { const a = db.alunos.find(z => z.id === x.alunoId); if (a && !a.grupo_id) a.grupo_id = p.grupoId; });
     const g = db.grupos.find(z => z.id === p.grupoId); if (g) g.com_lista = p.listaGrupo;
     if (p.assinaturaProf) me.assinatura = p.assinaturaProf;
@@ -395,7 +395,7 @@ const API = {
   },
   async saveAluno(al) {
     if (IS_GS) return gs('apiSaveAluno', al);
-    const o = Object.assign({}, al); if (o.rgpdAssinatura) { o.rgpd_estado = 'assinado'; o.rgpd_data = today(); } delete o.rgpdAssinatura; if (o.crianca === 'sim') o.foto_mini = '';
+    const o = Object.assign({}, al); if (o.rgpdAssinatura) { o.rgpd_estado = o.rgpdModo === 'testemunha' ? 'testemunhado' : 'assinado'; o.rgpd_data = today(); } delete o.rgpdAssinatura; if (o.crianca === 'sim') o.foto_mini = '';
     const i = DEMO.alunos.findIndex(z => z.id === o.id); if (i >= 0) DEMO.alunos[i] = Object.assign(DEMO.alunos[i], o); else DEMO.alunos.push(o);
     await kv.set('demo', DEMO); return { ok: true, aluno: demoAluno(o) };
   },
@@ -960,6 +960,7 @@ function novoAlunoFlow(paint) {
   alunoModal(null, { localId: f.local.id, grupoId: f.g.id, fixed: true, onSave: a => { f.novos.push(a); f.order.push(a.id); f.marks[a.id] = true; f.history.push(a.id); paint(); toast(`${firstName(a.nome)} adicionado(a) e marcado(a) presente`); } });
 }
 
+const RGPD_OK = ['assinado', 'testemunhado'];
 function rgpdText(crianca, temFoto) {
   return (crianca ? 'Autorizo, como encarregado(a) de educação, ' : 'Autorizo ') + 'a SGArtes a tratar estes dados apenas para gerir as aulas. ' +
     (crianca ? 'Não é guardada fotografia individual do menor. ' : temFoto ? 'A fotografia individual serve só para organização interna da associação e não é publicada. ' : '') +
@@ -975,17 +976,26 @@ function alunoModal(a, opt) {
   const av = h('div', { style: 'display:flex;align-items:center;gap:14px' });
   const paintAv = () => av.replaceChildren(avatar({ nome: nome.value || '?', foto_mini: crianca ? '' : foto }), crianca ? h('span', { class: 'mut cap' }, 'Menor: sem fotografia individual') : h('button', { class: 'btn ghost small', type: 'button', onclick: () => file.click() }, foto ? 'Mudar foto' : '📷 Foto (opcional)'));
   const rgpdBox = h('div', { class: 'card', style: 'margin-top:14px' });
+  let rgpdModo = d.rgpd_estado === 'recusado' ? 'recusado' : d.rgpd_estado === 'pendente' ? 'depois' : 'agora', rgpdConf = false;
   const paintRgpd = () => {
-    if (d.rgpd_estado === 'assinado') { rgpdBox.replaceChildren(h('div', { class: 'row-between' }, h('b', {}, 'Consentimento RGPD'), h('span', { class: 'chip ok' }, '✓ Assinado' + (d.rgpd_data ? ' ' + fmtShort(d.rgpd_data) : '')))); return; }
-    const pad = makePad(null, x => { rgpdSig = x; });
-    rgpdBox.replaceChildren(h('div', { class: 'row-between' }, h('b', {}, 'Consentimento RGPD'), h('span', { class: 'chip warn' }, 'Por assinar')),
-      h('p', { class: 'cap', style: 'margin:8px 0' }, rgpdText(crianca, !!foto)), pad.el, h('div', { class: 'tools' }, h('button', { class: 'link', type: 'button', onclick: () => pad.clear() }, 'Limpar')),
-      h('p', { class: 'mut cap', style: 'margin:0' }, crianca ? 'Assinatura do encarregado de educação.' : 'Assinatura do aluno. Pode ficar para depois.'));
+    if (RGPD_OK.includes(d.rgpd_estado)) { rgpdBox.replaceChildren(h('div', { class: 'row-between' }, h('b', {}, 'Consentimento RGPD'), h('span', { class: 'chip ok' }, (d.rgpd_estado === 'testemunhado' ? '✓ Confirmado por testemunha' : '✓ Assinado') + (d.rgpd_data ? ' ' + fmtShort(d.rgpd_data) : '')))); return; }
+    rgpdSig = null;
+    const segM = h('div', { class: 'seg', style: 'flex-wrap:wrap;margin-top:8px' }, ...[['agora', 'Assina agora'], ['testemunha', 'Não sabe assinar'], ['recusado', 'Recusa'], ['depois', 'Fica para depois']].map(([v, l]) => h('button', { type: 'button', class: rgpdModo === v ? 'on' : '', onclick: () => { rgpdModo = v; paintRgpd(); } }, l)));
+    const kids = [h('div', { class: 'row-between' }, h('b', {}, 'Consentimento RGPD'), d.rgpd_estado === 'recusado' ? h('span', { class: 'chip bad' }, 'Recusou') : h('span', { class: 'chip rgpd' }, 'Por assinar')), segM];
+    if (rgpdModo === 'agora' || rgpdModo === 'testemunha') {
+      const pad = makePad(null, x => { rgpdSig = x; });
+      kids.push(h('p', { class: 'cap', style: 'margin:8px 0' }, rgpdText(crianca, !!foto)));
+      if (rgpdModo === 'testemunha') kids.push(h('div', { class: 'check' + (rgpdConf ? ' on' : ''), role: 'checkbox', 'aria-checked': rgpdConf ? 'true' : 'false', style: 'display:flex;gap:10px;align-items:flex-start;margin:8px 0;cursor:pointer', onclick: () => { rgpdConf = !rgpdConf; paintRgpd(); } }, h('span', { class: 'box' }, rgpdConf ? '✓' : ''), h('span', { class: 'cap' }, 'Li este texto ao aluno, que não sabe assinar, e confirmo como testemunha que ele aceita o consentimento.')));
+      kids.push(pad.el, h('div', { class: 'tools' }, h('button', { class: 'link', type: 'button', onclick: () => pad.clear() }, 'Limpar')),
+        h('p', { class: 'mut cap', style: 'margin:0' }, rgpdModo === 'testemunha' ? 'Assinatura da testemunha (quem está a registar: funcionário ou professor).' : crianca ? 'Assinatura do encarregado de educação.' : 'Assinatura do aluno.'));
+    } else if (rgpdModo === 'recusado') kids.push(h('p', { class: 'cap', style: 'margin:8px 0' }, 'O aluno frequenta as aulas normalmente, mas não pode aparecer em fotografias. A app não volta a perguntar; pode mudar-se aqui mais tarde.'));
+    else kids.push(h('p', { class: 'cap', style: 'margin:8px 0' }, 'Fica pendente e pode ser assinado mais tarde, na aula, junto do professor ou do funcionário. Até lá não aparece em fotografias.'));
+    rgpdBox.replaceChildren(...kids);
   };
   const file = h('input', { type: 'file', accept: 'image/*', capture: 'user', hidden: true, onchange: async e => { if (e.target.files[0]) { try { foto = await squareThumb(e.target.files[0], 160); paintAv(); } catch (err) { toast(err.message); } } } });
   paintAv(); paintRgpd();
-  const kidSeg = h('div', { class: 'seg' }, ...[['nao', 'Adulto'], ['sim', 'Criança (menor)']].map(([v, l]) => h('button', { type: 'button', class: (crianca ? 'sim' : 'nao') === v ? 'on' : '', onclick: e => { crianca = v === 'sim'; [...kidSeg.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); paintAv(); if (d.rgpd_estado !== 'assinado') paintRgpd(); } }, l)));
-  const localSel = h('select', { class: 'in' }, ...S.d.locais.map(l => h('option', { value: l.id }, l.nome))); localSel.value = d.local_id || (S.d.locais[0] || {}).id;
+  const kidSeg = h('div', { class: 'seg' }, ...[['nao', 'Adulto'], ['sim', 'Criança (menor)']].map(([v, l]) => h('button', { type: 'button', class: (crianca ? 'sim' : 'nao') === v ? 'on' : '', onclick: e => { crianca = v === 'sim'; [...kidSeg.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); paintAv(); if (!RGPD_OK.includes(d.rgpd_estado)) paintRgpd(); } }, l)));
+  const localSel = h('select', { class: 'in' }, ...optsLocais()); localSel.value = d.local_id || (S.d.locais[0] || {}).id;
   const grupoSel = h('select', { class: 'in' });
   const fillGrupos = () => { grupoSel.replaceChildren(h('option', { value: '' }, 'Sem grupo (aparece em todos os grupos do local)'), ...S.d.grupos.filter(g => g.local_id === localSel.value).map(g => h('option', { value: g.id }, `${DIAS[Number(g.dia)] || ''} ${g.hora_inicio} · ${g.nome || ''}`))); grupoSel.value = d.grupo_id && S.d.grupos.some(g => g.id === d.grupo_id && g.local_id === localSel.value) ? d.grupo_id : ''; };
   localSel.addEventListener('change', () => { d.grupo_id = ''; fillGrupos(); }); fillGrupos();
@@ -1019,7 +1029,12 @@ function alunoModal(a, opt) {
         local_id: opt.fixed ? opt.localId : localSel.value, grupo_id: opt.fixed ? opt.grupoId : grupoSel.value });
       if (!seeData) { delete out.contacto; delete out.data_nascimento; }
       if (nasc.value && /^\d{4}-\d\d-\d\d$/.test(nasc.value)) out.aniv = nasc.value.slice(5);
-      if (rgpdSig) { out.rgpdAssinatura = rgpdSig; out.rgpd_estado = 'assinado'; out.rgpd_data = today(); }
+      if (!RGPD_OK.includes(d.rgpd_estado)) {
+        if (rgpdModo === 'testemunha' && rgpdSig && !rgpdConf) { toast('Confirma que és testemunha do consentimento.'); return; }
+        if ((rgpdModo === 'agora' || rgpdModo === 'testemunha') && rgpdSig) { out.rgpdAssinatura = rgpdSig; out.rgpdModo = rgpdModo; out.rgpd_estado = rgpdModo === 'testemunha' ? 'testemunhado' : 'assinado'; out.rgpd_data = today(); }
+        else out.rgpd_estado = rgpdModo === 'recusado' ? 'recusado' : 'pendente';
+      }
+      if (!RGPD_OK.includes(out.rgpd_estado)) out.foto_mini = '';
       s.close(); await opt.onSave(out);
     } }, 'Guardar'));
   if (!a) setTimeout(() => nome.focus(), 60);
@@ -1039,7 +1054,20 @@ function stepFoto() {
     paint();
   }
   const paint = () => {
-    box.replaceChildren(
+    const pres = f.lista ? f.order.map(alunoById).filter(a => a && f.marks[a.id] === true) : [];
+    f.rgpdFora = f.rgpdFora || {};
+    const pend = pres.filter(a => !RGPD_OK.includes(a.rgpd_estado) && a.rgpd_estado !== 'recusado'), recus = pres.filter(a => a.rgpd_estado === 'recusado');
+    const porDecidir = pend.filter(a => !f.rgpdFora[a.id]);
+    f.rgpdPorDecidir = porDecidir.length;
+    const marcaFora = a => { f.rgpdFora[a.id] = true; const n = Object.keys(f.rgpdFora).length; f.obs = (f.obs || '').replace(/\s*\[RGPD: [^\]]*\]/, '') + ' [RGPD: ' + n + ' presente(s) fora da foto]'; f.obs = f.obs.trim(); paint(); };
+    const assinar = a => alunoModal(a, { localId: a.local_id, grupoId: a.grupo_id, onSave: async out => { await saveAlunoEdit(out); const x = alunoById(a.id); if (x) Object.assign(x, out); paint(); } });
+    const avisoRgpd = pend.length ? h('div', { class: 'card', style: 'border:2px solid var(--rgpd);margin-bottom:14px' },
+      h('b', { style: 'color:var(--rgpd)' }, `Atenção: ${pend.length} presente(s) sem consentimento RGPD`),
+      h('p', { class: 'cap', style: 'margin:6px 0 8px' }, 'Podem aparecer na fotografia. Antes de a tirar, escolhe para cada um: assina agora ou fica fora da fotografia.'),
+      ...pend.map(a => h('div', { class: 'row', style: 'padding:6px 0;gap:8px;flex-wrap:wrap;align-items:center' }, h('div', { class: 'grow' }, a.nome),
+        f.rgpdFora[a.id] ? h('span', { class: 'chip rgpd' }, 'Fica fora da foto') : [h('button', { class: 'btn ghost small', onclick: () => assinar(a) }, 'Assina agora'), h('button', { class: 'btn ghost small', onclick: () => marcaFora(a) }, 'Fica fora da foto')]))) : null;
+    const avisoRecusa = recus.length ? h('p', { class: 'mut cap', style: 'margin:0 0 12px' }, 'Fora da foto (não aceitaram RGPD): ' + recus.map(a => a.nome).join(', ')) : null;
+    box.replaceChildren(avisoRgpd, avisoRecusa,
       h('button', { class: 'btn shot', onclick: () => cam.click() }, h('span', { style: 'font-size:38px' }, '📷'), f.fotos.length ? 'Tirar outra foto' : 'Tirar foto de grupo'),
       h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => gal.click() }, 'Escolher da galeria')), cam, gal,
       f.fotos.length ? h('div', { class: 'thumbs' }, ...f.fotos.map((p, i) => h('div', { class: 'th' },
@@ -1050,7 +1078,7 @@ function stepFoto() {
       h('label', { class: 'l' }, 'Observações (opcional)'),
       h('textarea', { class: 'in', placeholder: 'Ex.: dia festivo, mostra, aula ao ar livre…', value: f.obs, oninput: e => { f.obs = e.target.value; } }),
       h('div', { class: 'pills', style: 'margin-top:8px' }, ...['Dia festivo', 'Mostra', 'Aula ao ar livre'].map(t => h('button', { class: 'pill', onclick: e => { const ta = box.querySelector('textarea'); ta.value = (ta.value ? ta.value.trim() + '; ' : '') + t; f.obs = ta.value; } }, '+ ' + t))),
-      footer(() => setStep(1), () => setStep(3), 'Seguinte ›', f.fotos.length > 0, f.fotos.length ? '' : 'Falta a foto de grupo'));
+      footer(() => setStep(1), () => setStep(3), 'Seguinte ›', f.fotos.length > 0 && !f.rgpdPorDecidir, f.rgpdPorDecidir ? `Falta decidir o RGPD de ${f.rgpdPorDecidir} presente(s)` : f.fotos.length ? '' : 'Falta a foto de grupo'));
   };
   paint(); return box;
 }
@@ -1329,7 +1357,7 @@ function viewAlunos() {
       avatar(a), h('div', { class: 'grow' }, h('b', {}, a.nome), h('div', { class: 'mut cap' }, `${a.genero === 'H' ? 'Homem' : a.genero === 'M' ? 'Mulher' : 'Género por indicar'} · ${a.grupo_id ? ((grupoById(a.grupo_id) || {}).nome || 'grupo') : 'sem grupo'}${a.ativo === 'nao' ? ' · inativo' : ''}`))))
       : [h('p', { class: 'mut' }, 'Nenhum aluno encontrado.')]));
   };
-  const sel = h('select', { class: 'in', onchange: e => { st.localId = e.target.value; paint(); } }, h('option', { value: '' }, 'Todos os locais'), ...S.d.locais.map(l => h('option', { value: l.id }, l.nome))); sel.value = st.localId;
+  const sel = h('select', { class: 'in', onchange: e => { st.localId = e.target.value; paint(); } }, h('option', { value: '' }, 'Todos os locais'), ...optsLocais()); sel.value = st.localId;
   el.append(h('h1', {}, 'Alunos'),
     h('button', { class: 'btn primary', onclick: () => alunoModal(null, { localId: st.localId, onSave: saveAlunoEdit }) }, '＋ Novo aluno'), h('div', { style: 'height:12px' }), sel, h('div', { style: 'height:8px' }),
     h('input', { class: 'in', placeholder: 'Procurar por nome', value: st.q, oninput: e => { st.q = e.target.value; paint(); } }), h('div', { style: 'height:12px' }), list);
@@ -1355,12 +1383,12 @@ function viewRegistos() {
   if (!st.scope) st.scope = 'local';
   if (!st.localId) st.localId = (S.d.locais[0] || {}).id || ''; if (!st.projetoId) st.projetoId = (S.d.projetos[0] || {}).id || ''; if (!st.ym) st.ym = today().slice(0, 7);
   const inScope = () => st.scope === 'local' ? S.d.locais.filter(l => l.id === st.localId) : st.scope === 'projeto' ? S.d.locais.filter(l => l.projeto_id === st.projetoId) : S.d.locais;
-  const scopeLabel = () => st.scope === 'local' ? (localById(st.localId) || {}).nome : st.scope === 'projeto' ? ((projById(st.projetoId) || {}).entidade || (projById(st.projetoId) || {}).nome) : 'Todos os locais';
+  const scopeLabel = () => st.scope === 'local' ? (localById(st.localId) || {}).nome : st.scope === 'projeto' ? (projLabel(projById(st.projetoId)) + ((projById(st.projetoId) || {}).entidade ? ' · ' + projById(st.projetoId).entidade : '')) : 'Todos os locais';
   const periodLabel = () => st.all ? 'Todo o período' : `${cap(MESES[Number(st.ym.slice(5)) - 1])} ${st.ym.slice(0, 4)}`;
   const again = () => render();
-  const seg = h('div', { class: 'seg' }, ...[['local', 'Um local'], ['projeto', 'Uma junta'], ['todos', 'Tudo']].map(([v, l]) => h('button', { class: st.scope === v ? 'on' : '', onclick: () => { st.scope = v; again(); } }, l)));
-  const sel = st.scope === 'local' ? h('select', { class: 'in', onchange: e => { st.localId = e.target.value; again(); } }, ...S.d.locais.map(l => h('option', { value: l.id }, l.nome)))
-    : st.scope === 'projeto' ? h('select', { class: 'in', onchange: e => { st.projetoId = e.target.value; again(); } }, ...S.d.projetos.map(p => h('option', { value: p.id }, p.entidade || p.nome))) : null;
+  const seg = h('div', { class: 'seg' }, ...[['local', 'Um local'], ['projeto', 'Um projeto'], ['todos', 'Tudo']].map(([v, l]) => h('button', { class: st.scope === v ? 'on' : '', onclick: () => { st.scope = v; again(); } }, l)));
+  const sel = st.scope === 'local' ? h('select', { class: 'in', onchange: e => { st.localId = e.target.value; again(); } }, ...optsLocais())
+    : st.scope === 'projeto' ? h('select', { class: 'in', onchange: e => { st.projetoId = e.target.value; again(); } }, ...optsProjetos()) : null;
   if (sel) sel.value = st.scope === 'local' ? st.localId : st.projetoId;
   const label = h('b', { style: 'flex:1;text-align:center;font-size:16px' }, periodLabel()), list = h('div'), actions = h('div');
   const shift = k => { const [y, m] = st.ym.split('-').map(Number); const d = new Date(y, m - 1 + k, 1); st.ym = `${d.getFullYear()}-${pad2(d.getMonth() + 1)}`; again(); };
@@ -1395,13 +1423,14 @@ function viewRegistos() {
     if (!pages.length) { toast('Sem aulas para mostrar.'); return; }
     const body = pages.join('<div style="page-break-after:always;height:14px;border-bottom:2px dashed #ddd;margin-bottom:14px"></div>');
     const nome = `Registo de aulas - ${scopeLabel()} - ${st.all ? 'todo o periodo' : st.ym}`;
-    const s = openSheet('Folhas de presença', h('p', { class: 'mut cap', style: 'margin-top:0' }, `${pages.length} folha(s) · ${scopeLabel()} · ${periodLabel()}`), h('div', { class: 'sheetscroll' }, h('div', { html: body })),
+    const s = openSheet('Folhas de presença', h('p', { class: 'mut cap', style: 'margin-top:0' }, `${pages.length} folha(s) · ${scopeLabel()} · ${periodLabel()}`), h('div', { class: 'sheetscroll' }, h('div', { style: 'position:relative' }, h('div', { html: body }), isGestor() ? null : h('div', { style: marcaAgua() }))),
       h('p', { class: 'mut cap' }, 'Pré-visualização. Mantém-se também a folha em papel durante o piloto.'),
-      h('button', { class: 'btn primary', style: 'margin-bottom:10px', onclick: () => printSheets(pages) }, 'Imprimir / guardar PDF (igual ao ecrã)'),
+      ...(isGestor() ? [h('button', { class: 'btn primary', style: 'margin-bottom:10px', onclick: () => printSheets(pages) }, 'Imprimir / guardar PDF (igual ao ecrã)'),
       h('button', { class: 'btn ghost', onclick: async e => {
         e.currentTarget.disabled = true;
         try { const r = await API.savePdf(`<html><head><meta charset="utf-8"></head><body style="margin:0;padding:8mm">${body}</body></html>`, nome); s.close(); toast(r.demo ? 'No modo real, o PDF fica guardado no Drive.' : 'PDF guardado no Drive ✓'); if (r.url) openSheet('PDF guardado', h('a', { class: 'btn primary', href: r.url, target: '_blank', rel: 'noopener' }, 'Abrir o PDF')); } catch (err) { toast('Não consegui guardar o PDF: ' + err.message); e.currentTarget.disabled = false; }
-      } }, IS_GS ? 'Guardar PDF no Drive (versão simplificada)' : 'Guardar PDF (só na versão ligada)'));
+      } }, IS_GS ? 'Guardar PDF no Drive (versão simplificada)' : 'Guardar PDF (só na versão ligada)')] : [h('p', { class: 'mut cap' }, 'Só o gestor pode imprimir ou exportar as folhas. Se precisares de uma cópia, pede ao gestor.')]));
+    if (!isGestor()) document.body.classList.add('np');
   }
   el.append(h('h1', {}, 'Registos'), seg, h('div', { style: 'height:10px' }), sel, h('div', { style: 'height:6px' }),
     h('div', { class: 'row-between', style: 'margin:10px 0' }, st.all ? null : h('button', { class: 'btn ghost small', 'aria-label': 'Mês anterior', onclick: () => shift(-1) }, '‹'), label, st.all ? null : h('button', { class: 'btn ghost small', 'aria-label': 'Mês seguinte', onclick: () => shift(1) }, '›')),
@@ -1501,8 +1530,23 @@ ${rows.join('')}</table>
 let lastBoot = 0, listening = false;
 function applyBoot(r) {
   S.d = { projetos: r.projetos || [], locais: r.locais || [], grupos: r.grupos || [], professores: r.professores || [], alunos: r.alunos || [], atrib: r.atrib || [], semAulas: r.semAulas || [], aulas: r.aulas || [], aprovacoes: r.aprovacoes || [], gestao: r.gestao || null };
+  ordenaDados();
   S.me = r.me ? Object.assign({}, S.d.professores.find(p => p.id === r.me.id) || {}, r.me) : null;
   lastBoot = Date.now();
+}
+const ptCmp = (a, b) => String(a || '').localeCompare(String(b || ''), 'pt', { sensitivity: 'base' });
+function ordenaDados() {
+  const pj = id => S.d.projetos.find(p => p.id === id) || {};
+  S.d.projetos.sort((a, b) => ptCmp(a.entidade, b.entidade) || ptCmp(a.nome, b.nome));
+  S.d.locais.sort((a, b) => ptCmp(pj(a.projeto_id).entidade, pj(b.projeto_id).entidade) || ptCmp(pj(a.projeto_id).nome, pj(b.projeto_id).nome) || ptCmp(a.nome, b.nome));
+}
+function projLabel(p) { return p ? (p.nome || '') + (p.programa ? ' (' + p.programa + ')' : '') : ''; }
+function optsProjetos() { const g = {}; S.d.projetos.forEach(p => { const k = p.entidade || 'Sem entidade'; (g[k] = g[k] || []).push(p); }); return Object.keys(g).map(k => h('optgroup', { label: k }, ...g[k].map(p => h('option', { value: p.id }, projLabel(p))))); }
+function optsLocais() { const g = {}; S.d.locais.forEach(l => { const p = S.d.projetos.find(x => x.id === l.projeto_id) || {}; const k = (p.entidade ? p.entidade + ' · ' : '') + (p.nome || 'Sem projeto'); (g[k] = g[k] || []).push(l); }); return Object.keys(g).map(k => h('optgroup', { label: k }, ...g[k].map(l => h('option', { value: l.id }, l.nome)))); }
+function marcaAgua() {
+  const quem = String((S.me && S.me.nome) || '').replace(/[&<>'"]/g, ''), txt = 'Só para visualização · ' + quem + ' · ' + fmtShort(today());
+  const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='360' height='170'><text x='12' y='95' transform='rotate(-18 180 85)' font-family='Arial' font-size='15' fill='rgba(201,67,26,0.22)'>" + txt + '</text></svg>';
+  return 'position:absolute;inset:0;pointer-events:none;background-repeat:repeat;background-image:url("data:image/svg+xml,' + encodeURIComponent(svg) + '")';
 }
 async function refreshData(force) {
   if (!S.d || S.flow || !navigator.onLine || (!force && Date.now() - lastBoot < 60000)) return;
