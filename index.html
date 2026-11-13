@@ -387,6 +387,14 @@ const API = {
     if (IS_GS) return gs('apiPresencas', id);
     const a = DEMO.aulas.find(z => z.id === id) || {}; return { ok: true, presencas: (a.presencas || []).map(x => Object.assign({ nome: (DEMO.alunos.find(z => z.id === x.alunoId) || {}).nome }, x)) };
   },
+  async aulasAnuladas(localId, ym) {
+    if (IS_GS) return gs('apiAulasAnuladas', localId, ym);
+    return { ok: true, aulas: [] };
+  },
+  async restaurarAula(id) {
+    if (IS_GS) return gs('apiRestaurarAula', id);
+    return { ok: true };
+  },
   async eliminarAula(id, motivo) {
     if (IS_GS) return gs('apiEliminarAula', id, motivo);
     const i = DEMO.aulas.findIndex(z => z.id === id); if (i >= 0) DEMO.aulas.splice(i, 1);
@@ -1615,15 +1623,23 @@ function viewRegistos() {
     list.replaceChildren(...st.data.map(e => {
       e.aulas.forEach(x => { tot.n++; tot.h += Number(x.homens); tot.m += Number(x.mulheres); });
       const hh = e.aulas.reduce((n, x) => n + Number(x.homens), 0), mm = e.aulas.reduce((n, x) => n + Number(x.mulheres), 0);
-      if (st.all || st.scope !== 'local') return h('div', { class: 'card row' }, h('div', { class: 'grow' }, h('b', {}, e.loc.nome), h('div', { class: 'mut cap' }, `${e.aulas.length} aula(s) · ${hh} H · ${mm} M`)));
+      if (st.all || st.scope !== 'local') return h('button', { class: 'card row', style: 'margin-bottom:8px;width:100%;text-align:left', onclick: () => { st.scope = 'local'; st.localId = e.loc.id; st.all = false; again(); } }, h('div', { class: 'grow' }, h('b', {}, e.loc.nome), h('div', { class: 'mut cap' }, `${e.aulas.length} aula(s) · ${hh} H · ${mm} M`)), h('span', { class: 'mut' }, '\u203a'));
       return e.aulas.length || (e.feriados || []).length ? [...(e.feriados || []).map(f => h('div', { class: 'card row', style: 'margin-bottom:8px' }, h('div', { class: 'grow' }, h('b', {}, `${DIAS[dow(f.data)]} ${fmtShort(f.data)} · ${f.tipo === 'feriado' ? 'feriado' : 'sem aula'}`), h('div', { class: 'mut cap' }, (f.tipo === 'feriado' ? '' : (f.motivo || '') + ' · ') + 'consta na folha, sem assinaturas')))), ...e.aulas.map(x => h('button', { class: 'card row', style: 'margin-bottom:8px;width:100%;text-align:left', onclick: () => x.pendente ? toast('Esta aula ainda não seguiu para o servidor.') : aulaModal(x, () => render()) }, h('div', { class: 'grow' }, h('b', {}, `${DIAS[dow(x.data)]} ${fmtShort(x.data)} · ${x.hora_inicio}`), h('div', { class: 'mut cap' }, `${(profById(x.prof_deu_id) || {}).nome || ''}${x.nome_resp ? ' · assinou ' + x.nome_resp : x.pendente ? '' : ' · por assinar'}`)),
         h('div', { style: 'text-align:right' }, h('b', {}, Number(x.homens) + Number(x.mulheres)), h('div', { class: 'mut cap' }, `${x.homens} H · ${x.mulheres} M`)), x.pendente ? h('span', { class: 'chip warn' }, 'por enviar') : null))] : h('div', { class: 'card mut' }, 'Sem aulas neste período.');
     }));
     actions.replaceChildren(h('p', { class: 'mut' }, `${tot.n} aula(s) · ${tot.h} homens · ${tot.m} mulheres`), h('button', { class: 'btn primary', disabled: tot.n || st.scope === 'local' || st.data.some(e => (e.feriados || []).length) ? null : true, onclick: folhaPreview }, 'Ver folhas de presença'));
   };
+  const anuBox = h('div', {});
+  async function loadAnuladas() {
+    anuBox.replaceChildren();
+    if (!isGestor() || st.all || st.scope !== 'local' || !st.localId) return;
+    let r; try { r = await API.aulasAnuladas(st.localId, st.ym); } catch (e) { return; }
+    const as = (r && r.aulas) || []; if (!as.length) return;
+    anuBox.replaceChildren(h('h3', { style: 'margin:18px 0 6px;font-size:14px;color:#665A53' }, 'Anuladas (' + as.length + ')'), ...as.map(x => h('button', { class: 'card row', style: 'margin-bottom:8px;width:100%;text-align:left;opacity:.65', onclick: () => anuladaModal(x, () => again()) }, h('div', { class: 'grow' }, h('b', {}, `${DIAS[dow(x.data)]} ${fmtShort(x.data)} \u00b7 ${x.hora_inicio}`), h('div', { class: 'mut cap' }, `${x.homens} H \u00b7 ${x.mulheres} M \u00b7 anulada`)))));
+  }
   async function load() {
     list.replaceChildren(h('p', { class: 'mut' }, 'A carregar…'));
-    try { st.data = await Promise.all(inScope().map(async l => Object.assign({ loc: l }, await monthData(l.id, st.all ? '' : st.ym)))); } catch (e) { list.replaceChildren(h('div', { class: 'card' }, 'Não consegui carregar: ' + e.message)); return; } paint();
+    try { st.data = await Promise.all(inScope().map(async l => Object.assign({ loc: l }, await monthData(l.id, st.all ? '' : st.ym)))); } catch (e) { list.replaceChildren(h('div', { class: 'card' }, 'Não consegui carregar: ' + e.message)); return; } paint(); loadAnuladas();
   }
   function printSheets(pagesHtml) {
     const f = h('iframe', { style: 'position:fixed;right:0;bottom:0;width:0;height:0;border:0' }); document.body.append(f);
@@ -1652,7 +1668,7 @@ function viewRegistos() {
   }
   el.append(h('h1', {}, 'Registos'), seg, h('div', { style: 'height:10px' }), sel, h('div', { style: 'height:6px' }),
     h('div', { class: 'row-between', style: 'margin:10px 0' }, st.all ? null : h('button', { class: 'btn ghost small', 'aria-label': 'Mês anterior', onclick: () => shift(-1) }, '‹'), label, st.all ? null : h('button', { class: 'btn ghost small', 'aria-label': 'Mês seguinte', onclick: () => shift(1) }, '›')),
-    h('div', { class: 'tools', style: 'margin:-4px 0 12px' }, h('button', { class: 'pill' + (st.all ? ' on' : ''), onclick: () => { st.all = !st.all; again(); } }, 'Todo o período')), list, actions,
+    h('div', { class: 'tools', style: 'margin:-4px 0 12px' }, h('button', { class: 'pill' + (st.all ? ' on' : ''), onclick: () => { st.all = !st.all; again(); } }, 'Todo o período')), list, actions, anuBox,
     st.all ? null : pagamentosCard(st.ym));
   load(); return el;
 }
@@ -1818,6 +1834,19 @@ function localPick(o) {
   };
   paint(); return btn;
 }
+function anuladaModal(x, done) {
+  const l = localById(x.local_id) || {};
+  const s = openSheet('Aula anulada', h('p', { class: 'mut', style: 'margin-top:0' }, `${l.nome || ''} \u00b7 ${DIAS[dow(x.data)]} ${fmtShort(x.data)} \u00b7 ${x.hora_inicio} \u00b7 ${x.homens} H \u00b7 ${x.mulheres} M`), h('p', { class: 'mut' }, x.observacoes || ''),
+    h('button', { class: 'btn primary', onclick: async () => { try { await API.restaurarAula(x.id); } catch (e) { toast(e.server ? e.message : 'Sem liga\u00e7\u00e3o.'); return; } s.close(); toast('Aula restaurada'); done(); } }, 'Restaurar aula'),
+    h('button', { class: 'btn bad', style: 'margin-top:10px', onclick: () => {
+      const motivo = h('textarea', { class: 'in', placeholder: 'Motivo (opcional)' });
+      const c = openSheet('Eliminar o registo', h('p', { class: 'mut', style: 'margin-top:0' }, 'O registo desta aula \u00e9 eliminado de vez, com as presen\u00e7as. As fotos n\u00e3o se apagam: ficam na pasta Removidas do Drive. Fica registado quem eliminou.'), motivo,
+        h('button', { class: 'btn bad', style: 'margin-top:12px', onclick: async () => {
+          try { await API.eliminarAula(x.id, motivo.value.trim()); } catch (e) { toast(e.server ? e.message : 'Sem liga\u00e7\u00e3o. Eliminar precisa de rede.'); return; }
+          c.close(); s.close(); toast('Registo eliminado'); done();
+        } }, 'Eliminar definitivamente'));
+    } }, 'Eliminar o registo'));
+}
 function marcaAgua() {
   const quem = String((S.me && S.me.nome) || '').replace(/[&<>'"]/g, ''), txt = 'Só para visualização · ' + quem + ' · ' + fmtShort(today());
   const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='360' height='170'><text x='12' y='95' transform='rotate(-18 180 85)' font-family='Arial' font-size='15' fill='rgba(201,67,26,0.22)'>" + txt + '</text></svg>';
@@ -1849,7 +1878,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.13';
+const BUILD = 'v2.14';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
