@@ -1785,6 +1785,19 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
+const BUILD = 'v2.12';
+let updShown = false;
+async function checkUpdate() {
+  if (updShown || !navigator.onLine) return;
+  try {
+    const t = await (await fetch('index.html', { cache: 'no-store' })).text(), m = t.match(/const BUILD = '([^']+)'/);
+    if (!m || m[1] === BUILD) return;
+    updShown = true;
+    document.body.append(h('div', { style: 'position:fixed;left:12px;right:12px;bottom:74px;z-index:99;background:#241F1C;color:#fff;border-radius:14px;padding:12px 14px;display:flex;align-items:center;gap:10px;box-shadow:0 4px 18px rgba(0,0,0,.3)' }, h('span', { style: 'flex:1;font-size:14px' }, 'Há uma versão nova da app.'), h('button', { class: 'btn primary', style: 'padding:8px 14px;width:auto', onclick: () => location.reload() }, 'Atualizar')));
+  } catch (e) { }
+}
+setTimeout(checkUpdate, 6000);
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') checkUpdate(); });
 main();
 </script>
 </body>
