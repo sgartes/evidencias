@@ -339,6 +339,9 @@ function demoBanner() {
 
 const API = {
   async login(cred) { return gs('login', cred); },
+  async pedirCodigo(email) { return gs('pedirCodigo', email); },
+  async entrarCodigo(email, codigo) { return gs('entrarCodigo', email, codigo); },
+  async pedirAssinatura(localId, ids, nota, lembrete) { if (IS_GS) return gs('apiPedirAssinatura', localId, ids, nota, lembrete); return { ok: true, enviados: 1, aulas: ids.length, demo: true }; },
   async boot() {
     if (IS_GS) return gs('apiBootstrap');
     let db = await kv.get('demo', null); if (!db || !db.professores[0].valor_aula) { db = seedDemo(); await kv.set('demo', db); }
@@ -466,6 +469,7 @@ const projById = id => S.d.projetos.find(p => p.id === id);
 const profById = id => S.d.professores.find(p => p.id === id);
 const alunoById = id => S.d.alunos.find(a => a.id === id) || (S.flow && (S.flow.novos.find(a => a.id === id) || (S.temp[S.flow.g.id] || []).find(a => a.id === id)));
 const isGestor = () => !!(S.me && S.me.papel === 'gestor');
+const isFunc = () => !!(S.me && S.me.papel === 'funcionario');
 const effProf = (g, date) => { const a = S.d.atrib.find(x => x.grupo_id === g.id && String(x.data) === date); return a ? a.professor_id : g.professor_id; };
 const semAulaFor = (gid, date) => S.d.semAulas.find(x => x.grupo_id === gid && String(x.data) === date);
 const closedFor = (gid, data) => S.recent.find(r => r.grupoId === gid && r.data === data && r.estado !== 'anulada') || S.d.aulas.find(a => a.grupo_id === gid && a.data === data && a.estado !== 'anulada');
@@ -547,6 +551,7 @@ function render() {
   if (!S.me) { main.append(viewQuem()); chip(); return; }
   if (S.view === 'flow') main.append(viewFlow());
   else if (S.view === 'done') main.append(viewDone());
+  else if (isFunc()) main.append(viewFuncionario());
   else { main.append(S.tab === 'hoje' ? viewHoje() : S.tab === 'pend' ? viewPend() : S.tab === 'alunos' ? viewAlunos() : S.tab === 'gestao' && isGestor() ? viewGestao() : viewRegistos()); app.append(nav()); }
   chip();
 }
@@ -577,6 +582,7 @@ function profileMenu() {
 function renderLogin(msg) {
   const app = $('#app'), err = h('p', { class: 'mut', style: 'color:var(--bad);min-height:20px' }, msg || ''), btn = h('div', { style: 'min-height:48px' });
   app.replaceChildren(h('div', { class: 'login' }, h('img', { src: LOGO, alt: 'SGArtes', style: 'height:64px' }), h('h1', {}, 'Aulas'), h('p', { class: 'mut', style: 'max-width:320px' }, 'Entra com a tua conta Google. Só funciona com o email que o gestor registou.'), btn, err,
+    h('div', { style: 'margin-top:14px;width:100%;max-width:320px;border-top:1px solid var(--line);padding-top:14px' }, h('p', { class: 'mut cap', style: 'margin:0 0 8px' }, 'Trabalha numa das instituições parceiras?'), h('button', { class: 'btn ghost', onclick: () => loginFunc() }, 'Sou funcionário de uma instituição')),
     h('p', { class: 'mut cap', style: 'max-width:320px' }, 'Os dados dos alunos pertencem à SGArtes e só são usados para gerir as aulas.')));
   const init = () => {
     google.accounts.id.initialize({ client_id: CFG.GOOGLE_CLIENT_ID, auto_select: true, callback: async resp => {
@@ -588,6 +594,66 @@ function renderLogin(msg) {
   };
   if (window.google && google.accounts && google.accounts.id) init();
   else { const sc = document.createElement('script'); sc.src = 'https://accounts.google.com/gsi/client'; sc.async = true; sc.onload = init; sc.onerror = () => { err.textContent = 'Sem ligação: não consigo mostrar a entrada com Google.'; }; document.head.append(sc); }
+}
+/* N5: entrada do funcionário com código de 6 dígitos enviado por email */
+function loginFunc(emailIni) {
+  const app = $('#app'), msg = h('p', { class: 'mut', style: 'min-height:20px;max-width:320px' }, '');
+  const email = h('input', { class: 'in', type: 'email', inputmode: 'email', autocomplete: 'email', placeholder: 'O seu email profissional', value: emailIni || '' });
+  const code = h('input', { class: 'in', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '6', placeholder: 'Código de 6 dígitos', style: 'font-size:22px;letter-spacing:6px;text-align:center' });
+  const passo2 = h('div', { style: 'display:none;width:100%;max-width:320px' }, h('label', { class: 'l' }, 'Código recebido no email'), code,
+    h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: async e => { const b = e.currentTarget; b.disabled = true; msg.style.color = ''; msg.textContent = 'A entrar…';
+      try { const r = await API.entrarCodigo(email.value.trim(), code.value.trim()); TOKEN = r.token; await kv.set('token', TOKEN); main(); } catch (err) { msg.style.color = 'var(--bad)'; msg.textContent = err.message; b.disabled = false; } } }, 'Entrar'));
+  const pedir = h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: async e => { const b = e.currentTarget; b.disabled = true; msg.style.color = ''; msg.textContent = 'A enviar…';
+    try { const r = await API.pedirCodigo(email.value.trim()); msg.textContent = r.msg || 'Código enviado.'; passo2.style.display = 'block'; b.textContent = 'Enviar outro código'; setTimeout(() => code.focus(), 50); } catch (err) { msg.style.color = 'var(--bad)'; msg.textContent = err.message; } b.disabled = false; } }, 'Receber código no email');
+  app.replaceChildren(h('div', { class: 'login' }, h('img', { src: LOGO, alt: 'SGArtes', style: 'height:64px' }), h('h1', {}, 'Entrada de funcionário'),
+    h('p', { class: 'mut', style: 'max-width:320px' }, 'Escreva o email que deu à SGArtes. Recebe um código de 6 dígitos, válido durante 10 minutos.'),
+    h('div', { style: 'width:100%;max-width:320px' }, h('label', { class: 'l' }, 'Email'), email, pedir), passo2, msg,
+    h('button', { class: 'link', style: 'margin-top:10px', onclick: () => renderLogin() }, '‹ Voltar'),
+    h('p', { class: 'mut cap', style: 'max-width:320px' }, 'Por segurança, a sessão termina após 10 minutos sem atividade ou ao carregar em Sair.')));
+  setTimeout(() => email.focus(), 50);
+}
+async function sairFunc() { try { await API.logout(); } catch (e) { } TOKEN = ''; await kv.del('token'); await kv.del('boot'); location.reload(); }
+function armaInatividade() {
+  if (window.__idleOn) return; window.__idleOn = true; let tm;
+  const reset = () => { clearTimeout(tm); tm = setTimeout(() => { toast('Sessão terminada por inatividade.'); sairFunc(); }, 10 * 60000); };
+  ['pointerdown', 'keydown', 'scroll', 'touchstart'].forEach(ev => document.addEventListener(ev, reset, { passive: true })); reset();
+}
+/* Ecrã do funcionário: só as aulas por assinar do seu local */
+function viewFuncionario() {
+  S.sigAll = true; armaInatividade();
+  const el = h('div'), items = signItems(), by = {};
+  items.forEach(x => (by[x.localId] = by[x.localId] || []).push(x));
+  const nomes = (S.me.locais || []).map(id => (localById(id) || {}).nome).filter(Boolean).join(', ');
+  el.append(h('h1', {}, `Olá, ${firstName(S.me.nome)}`), h('p', { class: 'mut', style: 'margin-top:0' }, 'Funcionário da instituição' + (nomes ? ' · ' + nomes : '')),
+    h('p', { class: 'cap', style: 'margin:0 0 12px' }, 'Confirme com a sua assinatura as aulas que a SGArtes deu no seu espaço. Uma só assinatura vale para todas as aulas escolhidas.'));
+  if (!items.length) el.append(h('div', { class: 'card', style: 'text-align:center' }, '🎉 Não há aulas por assinar. Obrigado!'));
+  Object.keys(by).forEach(lid => el.append(h('div', { class: 'card' }, h('b', { style: 'font-size:16.5px' }, (localById(lid) || {}).nome || lid),
+    ...by[lid].map(x => { const a = x.aula || {}, n = (Number(a.homens) || 0) + (Number(a.mulheres) || 0);
+      return h('div', { class: 'row', style: 'padding:8px 0;border-bottom:1px solid var(--line)' }, h('div', { class: 'grow' }, h('b', {}, `${DIAS[dow(x.data)]} ${fmtShort(x.data)} · ${x.inicio}`),
+        h('div', { class: 'mut cap' }, [(profById(x.profId) || {}).nome, a.id ? n + ' participantes' : ''].filter(Boolean).join(' · ')))); }),
+    h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: () => signModal(lid) }, `Assinar (${by[lid].length})`))));
+  el.append(h('button', { class: 'btn ghost', style: 'margin-top:18px', onclick: sairFunc }, 'Sair'),
+    h('p', { class: 'mut cap' }, 'Por segurança, a sessão termina após 10 minutos sem atividade.'));
+  return el;
+}
+/* N1: o gestor pede a assinatura à distância aos funcionários do local */
+function pedidoBox(lid, its) {
+  const ped = (S.d.pedidos || []).find(p => p.local_id === lid), ids = its.map(x => x.aulaId).filter(Boolean);
+  const dias = ped ? Math.max(0, Math.floor((Date.now() - Date.parse(ped.criado_em)) / 864e5)) : 0, lembrar = !!ped && dias >= 5;
+  return h('div', { style: 'margin-top:8px' },
+    ped ? h('p', { class: 'mut cap', style: 'margin:0 0 6px' + (lembrar ? ';color:var(--warn);font-weight:700' : '') }, `${ped.tipo === 'lembrete' ? 'Lembrete' : 'Pedido'} enviado a ${fmtShort(String(ped.criado_em).slice(0, 10))} (há ${dias} dia${dias === 1 ? '' : 's'})${lembrar ? ' · ainda sem resposta' : ''}`) : null,
+    h('button', { class: 'btn ghost', disabled: ids.length ? null : true, onclick: () => pedidoModal(lid, ids, !!ped) }, lembrar ? 'Relembrar a entidade' : ped ? 'Enviar outra vez ao funcionário' : 'Pedir assinatura ao funcionário'),
+    ids.length < its.length ? h('p', { class: 'mut cap', style: 'margin:4px 0 0' }, `${its.length - ids.length} aula(s) ainda por sincronizar ficam de fora.`) : null);
+}
+function pedidoModal(lid, ids, lembrete) {
+  const nota = h('textarea', { class: 'in', placeholder: 'Nota opcional (ex.: obrigado pela colaboração)' });
+  const s = openSheet(lembrete ? 'Relembrar a entidade' : 'Pedir assinatura à distância',
+    h('p', { class: 'mut' }, `Vai ser enviado um email aos funcionários de ${(localById(lid) || {}).nome || 'este local'} com ${ids.length} aula(s) por assinar. Entram na app com um código recebido no email.`),
+    h('label', { class: 'l' }, 'Nota'), nota,
+    h('button', { class: 'btn primary', style: 'margin-top:14px', onclick: async e => { const b = e.currentTarget; b.disabled = true;
+      try { const r = await API.pedirAssinatura(lid, ids, nota.value, lembrete); S.d.pedidos = (S.d.pedidos || []).filter(p => p.local_id !== lid).concat([{ local_id: lid, criado_em: new Date().toISOString(), tipo: lembrete ? 'lembrete' : 'pedido', n: r.aulas }]);
+        s.close(); toast(r.demo ? 'No modo real, o email segue para o funcionário.' : `Email enviado a ${r.enviados} funcionário(s) ✓`); render(); }
+      catch (err) { toast(err.server ? err.message : 'Sem ligação ao servidor.'); b.disabled = false; } } }, 'Enviar email'));
 }
 function sigModal() {
   let data = null; const pad = makePad(null, d => { data = d; });
@@ -709,7 +775,7 @@ function viewAssin() {
   if (!items.length) el.append(h('div', { class: 'card', style: 'text-align:center' }, '🎉 Nenhuma assinatura em falta'));
   Object.keys(by).forEach(lid => el.append(h('div', { class: 'card' }, h('b', { style: 'font-size:16.5px' }, (localById(lid) || {}).nome || lid),
     ...by[lid].map(x => h('div', { class: 'row', style: 'padding:8px 0' }, h('div', { class: 'grow' }, `${DIAS[dow(x.data)]} ${fmtShort(x.data)} · ${x.inicio}`), S.sigAll && x.profId ? h('span', { class: 'mut cap' }, firstName((profById(x.profId) || {}).nome)) : null)),
-    h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: () => signModal(lid) }, `Recolher assinatura (${by[lid].length})`))));
+    h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: () => signModal(lid) }, `Recolher assinatura (${by[lid].length})`), isGestor() ? pedidoBox(lid, by[lid]) : null)));
   return el;
 }
 function atribuirModal(g, date) {
@@ -1314,12 +1380,13 @@ const GE = {
   professores: {
     tab: 'Professores', titulo: 'Professores', novo: 'Novo professor',
     items: () => (S.d.gestao ? S.d.gestao.professores : S.d.professores),
-    nome: p => p.nome + (p.ativo === 'nao' ? ' · inativo' : '') + (p.papel === 'gestor' ? ' · gestor' : ''), sub: p => p.email || 'sem email: ainda não pode entrar',
+    nome: p => p.nome + (p.ativo === 'nao' ? ' · inativo' : '') + (p.papel === 'gestor' ? ' · gestor' : p.papel === 'funcionario' ? ' · funcionário' : ''), sub: p => p.email || 'sem email: ainda não pode entrar',
     inactive: p => p.ativo === 'nao',
     fields: () => [
       { k: 'nome', l: 'Nome' },
-      { k: 'email', l: 'Email Google', type: 'email', help: 'A pessoa entra com a conta Google com este email.' },
-      { k: 'papel', l: 'Função', type: 'select', opts: () => [['professor', 'Professor'], ['gestor', 'Gestor']], def: 'professor' },
+      { k: 'email', l: 'Email', type: 'email', help: 'Professores e gestores entram com a conta Google deste email. Funcionários recebem neste email um código de entrada.' },
+      { k: 'papel', l: 'Função', type: 'select', opts: () => [['professor', 'Professor'], ['gestor', 'Gestor'], ['funcionario', 'Funcionário da instituição']], def: 'professor' },
+      { k: 'locais', l: 'Local (só para funcionários)', type: 'select', opts: () => [['', '—'], ...S.d.locais.map(l => [l.id, l.nome + ' · ' + ((projById(l.projeto_id) || {}).nome || '')])], def: '', help: 'O funcionário só vê e assina as aulas deste local.' },
       { k: 'valor_aula', l: 'Valor por aula (€)', type: 'number', help: 'Vazio = valor padrão.' },
       { k: 'ativo', l: 'Ativo?', type: 'select', opts: SIMNAO, def: 'sim', help: 'Inativo: deixa de poder entrar. Não se apaga nada.' }]
   },
@@ -1556,6 +1623,7 @@ let lastBoot = 0, listening = false;
 function applyBoot(r) {
   S.d = { projetos: r.projetos || [], locais: r.locais || [], grupos: r.grupos || [], professores: r.professores || [], alunos: r.alunos || [], atrib: r.atrib || [], semAulas: r.semAulas || [], aulas: r.aulas || [], aprovacoes: r.aprovacoes || [], gestao: r.gestao || null };
   ordenaDados();
+  S.d.pedidos = r.pedidos || [];
   S.me = r.me ? Object.assign({}, S.d.professores.find(p => p.id === r.me.id) || {}, r.me) : null;
   lastBoot = Date.now();
 }
