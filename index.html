@@ -1395,29 +1395,32 @@ function buildCaption(proj, loc, data) {
   const tpl = (proj.legenda_modelo || '').trim() || 'Aula de dança do projeto «{projeto}» – {local}, {data}.\n\n{mencoes}\n\n{hashtags}';
   return tpl.replace(/\{projeto\}/g, proj.nome).replace(/\{local\}/g, loc.nome).replace(/\{data\}/g, fmtShort(data)).replace(/\{mencoes\}/g, (proj.mencoes || '').trim()).replace(/\{hashtags\}/g, (proj.hashtags || '').trim()).replace(/\n{3,}/g, '\n\n').trim();
 }
-async function bannerFor(projId) {
-  if (S.banners[projId] !== undefined) return S.banners[projId];
-  let b = await kv.get('banner_' + projId, null);
-  if (!b) { try { b = (await API.banner(projId)).banner || ''; if (b) await kv.set('banner_' + projId, b); } catch (e) { b = ''; } }
-  S.banners[projId] = b; return b;
+async function bannerFor(loc, proj) {
+  const key = (loc && loc.id) || '';
+  if (S.banners[key] !== undefined) return S.banners[key];
+  let b = key ? await kv.get('banner2_' + key) : '';
+  if (!b && key) { try { const r = await fetch('banners/' + key + '.jpg'); if (r.ok) { const bl = await r.blob(); b = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(bl); }); if (b) await kv.set('banner2_' + key, b); } } catch (e) { b = ''; } }
+  if (!b && proj && proj.tem_banner) { try { b = (await API.banner(proj.id)).banner || ''; } catch (e) { b = ''; } }
+  S.banners[key] = b || ''; return S.banners[key];
 }
 async function composite(photo, banner) {
   const load = u => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = u; });
   const p = await load(photo), b = await load(banner), c = document.createElement('canvas');
-  c.width = p.naturalWidth; c.height = p.naturalHeight; const x = c.getContext('2d'); x.drawImage(p, 0, 0);
-  const bh = Math.round(b.naturalHeight * c.width / b.naturalWidth); x.drawImage(b, 0, c.height - bh, c.width, bh);
+  const bh = Math.round(b.naturalHeight * p.naturalWidth / b.naturalWidth);
+  c.width = p.naturalWidth; c.height = p.naturalHeight + bh; const x = c.getContext('2d');
+  x.fillStyle = '#fff'; x.fillRect(0, 0, c.width, c.height); x.drawImage(p, 0, 0); x.drawImage(b, 0, p.naturalHeight, c.width, bh);
   return c.toDataURL('image/jpeg', .88);
 }
 async function postModal(rec) {
   const proj = projById(rec.projetoId), loc = localById(rec.localId), raw = rec.fotosLocal && rec.fotosLocal[0];
-  let banner = proj.tem_banner && raw ? await bannerFor(proj.id) : '', useB = !!banner, photo = raw;
+  let banner = raw ? await bannerFor(loc, proj) : '', useB = !!banner, photo = raw;
   const img = h('img', { alt: 'Foto do post', style: 'width:100%;max-height:300px;object-fit:contain;border-radius:16px;margin-bottom:8px;background:#000' });
   const paintImg = async () => { photo = raw && useB && banner ? await composite(raw, banner).catch(() => raw) : raw; if (photo) img.src = photo; };
   await paintImg();
   const ta = h('textarea', { class: 'in', rows: '8', style: 'min-height:170px' }); ta.value = rec.legenda || buildCaption(proj, loc, rec.data);
   ta.addEventListener('input', () => { rec.legenda = ta.value; });
   const bBtn = banner ? h('button', { class: 'card check' + (useB ? ' on' : ''), style: 'margin-bottom:10px', onclick: async () => { useB = !useB; bBtn.classList.toggle('on', useB); bBtn.querySelector('.box').textContent = useB ? '✓' : ''; await paintImg(); } },
-    h('span', { class: 'box' }, useB ? '✓' : ''), h('b', {}, 'Com o banner do projeto')) : null;
+    h('span', { class: 'box' }, useB ? '✓' : ''), h('b', {}, 'Com o banner do local')) : null;
   const s = openSheet('Post no Instagram',
     raw ? img : h('p', { class: 'mut' }, 'A foto já não está neste telemóvel. Escolhe-a da galeria no Instagram.'), bBtn,
     h('label', { class: 'l', style: 'margin-top:0' }, 'Legenda (podes editar)'), ta,
