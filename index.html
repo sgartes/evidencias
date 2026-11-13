@@ -1273,16 +1273,20 @@ function stepFoto() {
     const pres = f.lista ? f.order.map(alunoById).filter(a => a && f.marks[a.id] === true) : [];
     f.rgpdFora = f.rgpdFora || {};
     const pend = pres.filter(a => !RGPD_OK.includes(a.rgpd_estado) && a.rgpd_estado !== 'recusado'), recus = pres.filter(a => a.rgpd_estado === 'recusado');
-    const porDecidir = pend.filter(a => !f.rgpdFora[a.id]);
+    const porDecidir = pend.filter(a => !f.rgpdFora[a.id] && !(f.rgpdRisco || {})[a.id]);
+    f.rgpdRisco = f.rgpdRisco || {};
     f.rgpdPorDecidir = porDecidir.length;
+    f.rgpdConfFalta = recus.length > 0 && !f.rgpdConf;
+    f.rgpdSnap = { recus: recus.map(a => a.nome), fora: pend.filter(a => f.rgpdFora[a.id]).map(a => a.nome), risco: pend.filter(a => f.rgpdRisco[a.id]).map(a => a.nome) };
+    const avancaRisco = a => { const sh = openSheet('Avançar sem consentimento', h('p', {}, a.nome + ' não tem consentimento RGPD. Se aparecer na foto e a publicares, o risco é teu.'), h('button', { class: 'btn primary', style: 'margin-top:10px', onclick: () => { f.rgpdRisco[a.id] = true; sh.close(); paint(); } }, 'Avançar mesmo assim, por minha conta e risco'), h('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: () => sh.close() }, 'Cancelar')); };
     const marcaFora = a => { f.rgpdFora[a.id] = true; const n = Object.keys(f.rgpdFora).length; f.obs = (f.obs || '').replace(/\s*\[RGPD: [^\]]*\]/, '') + ' [RGPD: ' + n + ' presente(s) fora da foto]'; f.obs = f.obs.trim(); paint(); };
     const assinar = a => alunoModal(a, { localId: a.local_id, grupoId: a.grupo_id, onSave: async out => { await saveAlunoEdit(out); const x = alunoById(a.id); if (x) Object.assign(x, out); paint(); } });
     const avisoRgpd = pend.length ? h('div', { class: 'card', style: 'border:2px solid var(--rgpd);margin-bottom:14px' },
       h('b', { style: 'color:var(--rgpd)' }, `Atenção: ${pend.length} presente(s) sem consentimento RGPD`),
       h('p', { class: 'cap', style: 'margin:6px 0 8px' }, 'Podem aparecer na fotografia. Antes de a tirar, escolhe para cada um: assina agora ou fica fora da fotografia.'),
       ...pend.map(a => h('div', { class: 'row', style: 'padding:6px 0;gap:8px;flex-wrap:wrap;align-items:center' }, h('div', { class: 'grow' }, a.nome),
-        f.rgpdFora[a.id] ? h('span', { class: 'chip rgpd' }, 'Fica fora da foto') : [h('button', { class: 'btn ghost small', onclick: () => assinar(a) }, 'Assina agora'), h('button', { class: 'btn ghost small', onclick: () => marcaFora(a) }, 'Fica fora da foto')]))) : null;
-    const avisoRecusa = recus.length ? h('p', { class: 'mut cap', style: 'margin:0 0 12px' }, 'Fora da foto (não aceitaram RGPD): ' + recus.map(a => a.nome).join(', ')) : null;
+        f.rgpdFora[a.id] ? h('span', { class: 'chip rgpd' }, 'Fica fora da foto') : f.rgpdRisco[a.id] ? h('span', { class: 'chip rgpd' }, 'Avança sem consentimento (risco do professor)') : [h('button', { class: 'btn ghost small', onclick: () => assinar(a) }, 'Assina agora'), h('button', { class: 'btn ghost small', onclick: () => marcaFora(a) }, 'Fica fora da foto'), h('button', { class: 'btn ghost small', onclick: () => avancaRisco(a) }, 'Avançar mesmo assim')]))) : null;
+    const avisoRecusa = recus.length ? h('div', { class: 'card', style: 'border:2px solid var(--rgpd);margin-bottom:14px' }, h('b', { style: 'color:var(--rgpd)' }, 'Não aceitaram RGPD: ' + recus.map(a => a.nome).join(', ')), h('label', { style: 'display:flex;gap:10px;align-items:flex-start;margin-top:8px' }, h('input', { type: 'checkbox', checked: !!f.rgpdConf, style: 'width:24px;height:24px;flex:none', onchange: e => { f.rgpdConf = e.target.checked; paint(); } }), h('span', {}, 'Confirmo que ' + recus.map(a => a.nome).join(', ') + (recus.length > 1 ? ' não aparecem' : ' não aparece') + ' na foto'))) : null;
     const prev = h('div', { style: 'margin:4px 0 12px' });
     if (f.fotos.length) (async () => { try { const bn = await bannerFor(f.local, f.proj); if (!bn) return; const u = await composite(f.fotos[0].dataUrl, bn); prev.replaceChildren(h('p', { class: 'mut cap', style: 'margin:0 0 6px' }, 'Assim vai o post, com o banner do local:'), h('img', { src: u, alt: 'Post com banner', style: 'width:100%;border-radius:12px;display:block' })); } catch (e) { } })();
     box.replaceChildren(avisoRgpd, avisoRecusa,
@@ -1297,7 +1301,7 @@ function stepFoto() {
       h('label', { class: 'l' }, 'Observações (opcional)'),
       h('textarea', { class: 'in', placeholder: 'Ex.: dia festivo, mostra, aula ao ar livre…', value: f.obs, oninput: e => { f.obs = e.target.value; } }),
       h('div', { class: 'pills', style: 'margin-top:8px' }, ...['Dia festivo', 'Mostra', 'Aula ao ar livre'].map(t => h('button', { class: 'pill', onclick: e => { const ta = box.querySelector('textarea'); ta.value = (ta.value ? ta.value.trim() + '; ' : '') + t; f.obs = ta.value; } }, '+ ' + t))),
-      footer(() => setStep(1), () => setStep(3), 'Seguinte ›', f.fotos.length > 0 && !f.rgpdPorDecidir, f.rgpdPorDecidir ? `Falta decidir o RGPD de ${f.rgpdPorDecidir} presente(s)` : f.fotos.length ? '' : 'Falta a foto de grupo'));
+      footer(() => setStep(1), () => setStep(3), 'Seguinte ›', f.fotos.length > 0 && !f.rgpdPorDecidir && !f.rgpdConfFalta, f.rgpdPorDecidir ? `Falta decidir o RGPD de ${f.rgpdPorDecidir} presente(s)` : f.rgpdConfFalta ? 'Falta confirmar que quem recusou RGPD não aparece na foto' : f.fotos.length ? '' : 'Falta a foto de grupo'));
   };
   paint(); return box;
 }
@@ -1396,7 +1400,7 @@ async function finish() {
   if (f.lista) f.order.forEach(id => { const a = alunoById(id); if (a && f.marks[id] === true && !a.grupo_id) a.grupo_id = f.g.id; });
   f.g.com_lista = payload.listaGrupo; if ((needP || f.modoP === 'nova') && f.assinP) S.me.assinatura = f.assinP;
   const rec = { idCliente: idc, aulaId: null, estado: 'por_enviar', erro: '', grupoId: f.g.id, localId: f.local.id, projetoId: f.proj.id, data: f.data, inicio: f.inicio, fim: payload.fim, dur: f.dur, homens: c.h, mulheres: c.m, nomeResp: payload.nomeResp, semAssin: !payload.assinaturaResp, profId: S.me.id,
-    form_estado: 'pendente', post_estado: f.proj.post_publico === 'nao' ? 'na' : semPost ? 'nao_publicar' : 'pendente', formUrl: '', formErro: '', fotosLocal: payload.fotos.slice(), aprovacao: fora ? 'pendente' : '' };
+    form_estado: 'pendente', post_estado: f.proj.post_publico === 'nao' ? 'na' : semPost ? 'nao_publicar' : 'pendente', formUrl: '', formErro: '', fotosLocal: payload.fotos.slice(), rgpd: f.rgpdSnap || null, aprovacao: fora ? 'pendente' : '' };
   S.recent.unshift(rec); S.queue.push({ idCliente: idc, payload });
   await kv.set('queue', S.queue); await saveRecent();
   S.flow = null; S.doneId = idc; go('done'); flush(true);
@@ -1468,11 +1472,16 @@ async function postModal(rec) {
   ta.addEventListener('input', () => { rec.legenda = ta.value; });
   const bBtn = banner ? h('button', { class: 'card check' + (useB ? ' on' : ''), style: 'margin-bottom:10px', onclick: async () => { useB = !useB; bBtn.classList.toggle('on', useB); bBtn.querySelector('.box').textContent = useB ? '✓' : ''; await paintImg(); } },
     h('span', { class: 'box' }, useB ? '✓' : ''), h('b', {}, 'Com o banner do local')) : null;
+  const rg = rec.rgpd || {}; let rgOk = !(rg.recus && rg.recus.length);
+  const rgBox = (rg.recus && rg.recus.length) || (rg.risco && rg.risco.length) ? h('div', { class: 'card', style: 'border:2px solid var(--rgpd);margin-bottom:12px' },
+    rg.recus && rg.recus.length ? h('label', { style: 'display:flex;gap:10px;align-items:flex-start' }, h('input', { type: 'checkbox', style: 'width:24px;height:24px;flex:none', onchange: e => { rgOk = e.target.checked; } }), h('span', {}, 'Confirmo que ' + rg.recus.join(', ') + (rg.recus.length > 1 ? ' não aparecem' : ' não aparece') + ' na foto')) : null,
+    rg.risco && rg.risco.length ? h('p', { class: 'cap', style: 'margin:8px 0 0' }, 'Sem consentimento RGPD (risco do professor): ' + rg.risco.join(', ')) : null) : null;
   const s = openSheet('Post no Instagram',
-    raw ? img : h('p', { class: 'mut' }, 'A foto já não está neste telemóvel. Escolhe-a da galeria no Instagram.'), bBtn,
+    rgBox, raw ? img : h('p', { class: 'mut' }, 'A foto já não está neste telemóvel. Escolhe-a da galeria no Instagram.'), bBtn,
     h('label', { class: 'l', style: 'margin-top:0' }, 'Legenda (podes editar)'), ta,
     h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: async () => toast((await copyText(ta.value)) ? 'Legenda copiada ✓' : 'Não consegui copiar. Seleciona o texto e copia.') }, '1. Copiar legenda'),
     h('button', { class: 'btn primary', style: 'margin-top:10px', disabled: raw ? null : true, onclick: async () => {
+      if (!rgOk) { toast('Confirma primeiro que não aparece na foto quem recusou RGPD.'); return; }
       try {
         const file = new File([dataUrlToBlob(photo)], 'aula.jpg', { type: 'image/jpeg' });
         if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file] }); return; }
@@ -1481,7 +1490,7 @@ async function postModal(rec) {
     } }, '2. Enviar foto para o Instagram'),
     h('a', { class: 'btn ghost', style: 'margin-top:10px', href: 'https://www.instagram.com/', target: '_blank', rel: 'noopener' }, 'Abrir o Instagram'),
     h('p', { class: 'mut cap' }, 'Ao partilhar, escolhe o Instagram, cola a legenda e confirma as identificações. Depois volta aqui e toca em “Já publiquei”.'),
-    h('button', { class: 'btn ok', style: 'margin-top:6px', onclick: async () => { s.close(); await markEstado(rec, { post_estado: 'publicado' }); } }, 'Já publiquei ✓'));
+    h('button', { class: 'btn ok', style: 'margin-top:6px', onclick: async () => { if (!rgOk) { toast('Confirma primeiro que não aparece na foto quem recusou RGPD.'); return; } s.close(); await markEstado(rec, { post_estado: 'publicado' }); } }, 'Já publiquei ✓'));
 }
 /* ---------- ALUNOS ---------- */
 
@@ -1891,7 +1900,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.17';
+const BUILD = 'v2.18';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
