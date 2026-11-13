@@ -342,6 +342,9 @@ const API = {
   async pedirCodigo(email) { return gs('pedirCodigo', email); },
   async entrarCodigo(email, codigo) { return gs('entrarCodigo', email, codigo); },
   async pedirAssinatura(localId, ids, nota, lembrete) { if (IS_GS) return gs('apiPedirAssinatura', localId, ids, nota, lembrete); return { ok: true, enviados: 1, aulas: ids.length, demo: true }; },
+  async proporAluno(a) { if (IS_GS) return gs('apiProporAluno', a); return { ok: true, demo: true, alteracao: { id: 'AL-demo-' + Date.now(), tipo: DEMO.alunos.some(z => z.id === a.id) ? 'editar' : 'novo', aluno_id: a.id, estado: 'pendente', criado_em: new Date().toISOString(), nome: a.nome, local_id: a.local_id } }; },
+  async decidirAlteracao(id, ok) { if (IS_GS) return gs('apiDecidirAlteracao', id, ok); return { ok: true, demo: true }; },
+  async decidirFotos(aulaId, pub, nao) { if (IS_GS) return gs('apiDecidirFotos', aulaId, pub, nao); return { ok: true, demo: true, decididas: (pub || []).length + (nao || []).length, restantes: 0 }; },
   async boot() {
     if (IS_GS) return gs('apiBootstrap');
     let db = await kv.get('demo', null); if (!db || !db.professores[0].valor_aula) { db = seedDemo(); await kv.set('demo', db); }
@@ -358,7 +361,7 @@ const API = {
     if (IS_GS) return gs('apiRoster', gid);
     const g = DEMO.grupos.find(x => x.id === gid); return { ok: true, alunos: DEMO.alunos.filter(a => a.grupo_id === gid || (!a.grupo_id && a.local_id === g.local_id)).map(demoAluno) };
   },
-  async uploadFoto(idc, i, dataUrl, base) { if (IS_GS) return gs('apiUploadFoto', idc, i, dataUrl, base); return { ok: true, url: 'demo://foto' }; },
+  async uploadFoto(idc, i, dataUrl, base, projId) { if (IS_GS) return gs('apiUploadFoto', idc, i, dataUrl, base, projId); return { ok: true, url: 'demo://foto' }; },
   async saveAula(p) {
     if (IS_GS) return gs('apiSaveAula', p);
     const db = DEMO; const ex = db.aulas.find(a => a.id_cliente === p.idCliente); if (ex) return { ok: true, aulaId: ex.id, formUrl: '', aprovacao: ex.aprovacao };
@@ -504,7 +507,7 @@ const OPS = {
 async function sendAula(item, rec) {
   const p = item.payload; p.fotoUrls = p.fotoUrls || [];
   const base = `${p.data} ${(localById(p.localId) || {}).nome || ''}`;
-  while (p.fotos && p.fotos.length) { const u = await API.uploadFoto(p.idCliente, p.fotoUrls.length, p.fotos[0], base); p.fotoUrls.push(u.url); p.fotos.shift(); await kv.set('queue', S.queue); }
+  while (p.fotos && p.fotos.length) { const u = await API.uploadFoto(p.idCliente, p.fotoUrls.length, p.fotos[0], base, p.localId); p.fotoUrls.push(u.url); p.fotos.shift(); await kv.set('queue', S.queue); }
   const r = await API.saveAula(p);
   if (rec) {
     rec.estado = 'enviada'; rec.aulaId = r.aulaId; rec.formUrl = r.formUrl || ''; rec.formErro = r.formErro || ''; rec.erro = ''; rec.aprovacao = r.aprovacao || '';
@@ -621,11 +624,12 @@ function armaInatividade() {
 /* Ecrã do funcionário: só as aulas por assinar do seu local */
 function viewFuncionario() {
   S.sigAll = true; armaInatividade();
+  if (S.fTab === 'alunos') return viewAlunosFunc();
   const el = h('div'), items = signItems(), by = {};
   items.forEach(x => (by[x.localId] = by[x.localId] || []).push(x));
   const nomes = (S.me.locais || []).map(id => (localById(id) || {}).nome).filter(Boolean).join(', ');
   el.append(h('h1', {}, `Olá, ${firstName(S.me.nome)}`), h('p', { class: 'mut', style: 'margin-top:0' }, 'Funcionário da instituição' + (nomes ? ' · ' + nomes : '')),
-    h('p', { class: 'cap', style: 'margin:0 0 12px' }, 'Confirme com a sua assinatura as aulas que a SGArtes deu no seu espaço. Uma só assinatura vale para todas as aulas escolhidas.'));
+    funcTabs(), h('p', { class: 'cap', style: 'margin:0 0 12px' }, 'Confirme com a sua assinatura as aulas que a SGArtes deu no seu espaço. Uma só assinatura vale para todas as aulas escolhidas.'));
   if (!items.length) el.append(h('div', { class: 'card', style: 'text-align:center' }, '🎉 Não há aulas por assinar. Obrigado!'));
   Object.keys(by).forEach(lid => el.append(h('div', { class: 'card' }, h('b', { style: 'font-size:16.5px' }, (localById(lid) || {}).nome || lid),
     ...by[lid].map(x => { const a = x.aula || {}, n = (Number(a.homens) || 0) + (Number(a.mulheres) || 0);
@@ -634,6 +638,35 @@ function viewFuncionario() {
     h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: () => signModal(lid) }, `Assinar (${by[lid].length})`))));
   el.append(h('button', { class: 'btn ghost', style: 'margin-top:18px', onclick: sairFunc }, 'Sair'),
     h('p', { class: 'mut cap' }, 'Por segurança, a sessão termina após 10 minutos sem atividade.'));
+  return el;
+}
+/* N2: o funcionário vê os alunos do seu local e propõe alterações (o gestor aprova) */
+function funcTabs() {
+  const np = (S.d.alteracoes || []).filter(x => x.estado === 'pendente').length;
+  return h('div', { class: 'seg', style: 'margin-bottom:12px' }, ...[['assin', 'Aulas por assinar'], ['alunos', 'Alunos' + (np ? ` (${np} pedido${np === 1 ? '' : 's'})` : '')]].map(([v, t]) => h('button', { class: (S.fTab || 'assin') === v ? 'on' : '', onclick: () => { S.fTab = v; render(); } }, t)));
+}
+async function proporAlunoFunc(a) {
+  try { const r = await API.proporAluno(a); S.d.alteracoes = (S.d.alteracoes || []).filter(x => x.id !== r.alteracao.id).concat([r.alteracao]); toast(r.demo ? 'No modo real, o pedido segue para o gestor.' : 'Pedido enviado ao gestor ✓'); }
+  catch (e) { toast(e.server ? e.message : 'Sem ligação ao servidor. Tente outra vez.'); }
+  render();
+}
+function viewAlunosFunc() {
+  const el = h('div'), alts = S.d.alteracoes || [], pend = {};
+  alts.filter(x => x.estado === 'pendente').forEach(x => { pend[x.aluno_id] = true; });
+  const locId = (S.me.locais || [])[0] || '', rows = S.d.alunos.slice().sort(byName);
+  const nomes = (S.me.locais || []).map(id => (localById(id) || {}).nome).filter(Boolean).join(', ');
+  el.append(h('h1', {}, `Olá, ${firstName(S.me.nome)}`), h('p', { class: 'mut', style: 'margin-top:0' }, 'Funcionário da instituição' + (nomes ? ' · ' + nomes : '')), funcTabs(),
+    h('p', { class: 'cap', style: 'margin:0 0 12px' }, 'Proponha novos alunos ou corrija os dados. A SGArtes aprova antes de ficar em vigor.'),
+    h('button', { class: 'btn primary', onclick: () => alunoModal(null, { localId: locId, onSave: proporAlunoFunc }) }, '＋ Propor novo aluno'), h('div', { style: 'height:12px' }));
+  const lista = h('div', { class: 'card', style: 'padding:6px 16px' });
+  lista.replaceChildren(...(rows.length ? rows.map(a => h('button', { class: 'row', style: 'width:100%;background:none;border:0;text-align:left;border-bottom:1px solid var(--line)', onclick: () => alunoModal(a, { onSave: proporAlunoFunc }) },
+    avatar(a), h('div', { class: 'grow' }, h('b', {}, a.nome), h('div', { class: 'mut cap' }, `${a.genero === 'H' ? 'Homem' : a.genero === 'M' ? 'Mulher' : 'Género por indicar'} · ${a.grupo_id ? ((grupoById(a.grupo_id) || {}).nome || 'grupo') : 'sem grupo'}${a.ativo === 'nao' ? ' · inativo' : ''}`)),
+    pend[a.id] ? h('span', { class: 'chip warn' }, 'Pedido a aguardar') : null)) : [h('p', { class: 'mut' }, 'Ainda não há alunos neste local.')]));
+  el.append(lista);
+  if (alts.length) el.append(h('h2', { style: 'margin:18px 0 6px' }, 'Os seus pedidos'), h('div', { class: 'card', style: 'padding:6px 16px' }, ...alts.slice().sort((x, y) => String(y.criado_em).localeCompare(String(x.criado_em))).map(x => h('div', { class: 'row', style: 'padding:8px 0;border-bottom:1px solid var(--line)' },
+    h('div', { class: 'grow' }, h('b', {}, (x.tipo === 'novo' ? 'Novo aluno · ' : 'Alteração · ') + x.nome), h('div', { class: 'mut cap' }, fmtShort(String(x.criado_em).slice(0, 10)))),
+    h('span', { class: 'chip ' + (x.estado === 'aprovada' ? 'ok' : x.estado === 'rejeitada' ? 'bad' : 'warn') }, x.estado === 'aprovada' ? 'Aprovado' : x.estado === 'rejeitada' ? 'Rejeitado' : 'A aguardar')))));
+  el.append(h('button', { class: 'btn ghost', style: 'margin-top:18px', onclick: sairFunc }, 'Sair'), h('p', { class: 'mut cap' }, 'Por segurança, a sessão termina após 10 minutos sem atividade.'));
   return el;
 }
 /* N1: o gestor pede a assinatura à distância aos funcionários do local */
@@ -711,10 +744,65 @@ function birthdays() {
 }
 function viewPend() {
   const el = h('div'), nl = lateItems().length, ns = signItems().length, na = (S.d.aprovacoes || []).length;
-  const opts = [['sem', `Sem evidências (${nl})`], ['assin', `Assinaturas (${ns})`]]; if (isGestor()) opts.push(['aprov', `Aprovar (${na})`]);
+  const opts = [['sem', `Sem evidências (${nl})`], ['assin', `Assinaturas (${ns})`]]; if (isGestor()) opts.push(['aprov', `Aprovar (${na})`], ['fotos', `Fotos (${(S.d.fotosPend || []).length})`], ['alun', `Alunos (${(S.d.alteracoes || []).length})`]);
   if (!opts.some(o => o[0] === S.pend)) S.pend = 'sem';
-  el.append(h('h1', {}, 'Pendentes'), h('div', { class: 'seg' }, ...opts.map(([v, l]) => h('button', { class: S.pend === v ? 'on' : '', style: 'font-size:13.5px;padding:0 6px', onclick: () => { S.pend = v; render(); } }, l))), h('div', { style: 'height:14px' }),
-    S.pend === 'sem' ? viewOutras() : S.pend === 'assin' ? viewAssin() : viewAprov());
+  el.append(h('h1', {}, 'Pendentes'), h('div', { class: 'seg', style: 'flex-wrap:wrap' }, ...opts.map(([v, l]) => h('button', { class: S.pend === v ? 'on' : '', style: 'font-size:13.5px;padding:0 6px', onclick: () => { S.pend = v; render(); } }, l))), h('div', { style: 'height:14px' }),
+    S.pend === 'sem' ? viewOutras() : S.pend === 'assin' ? viewAssin() : S.pend === 'fotos' ? viewFotos() : S.pend === 'alun' ? viewAlteracoes() : viewAprov());
+  return el;
+}
+/* N9: o gestor decide, foto a foto, o que se publica. As fotos ficam em Drive/Fotos/Por aprovar até decidir. */
+function viewFotos() {
+  const el = h('div'), list = S.d.fotosPend || [];
+  el.append(h('p', { class: 'mut cap', style: 'margin-top:0' }, 'Fotos das aulas, ainda por decidir. Escolha o que pode ser publicado; o resto fica guardado em "Não publicadas". Se aparecerem crianças ou alunos sem consentimento, a sugestão é não publicar.'));
+  if (!list.length) el.append(h('div', { class: 'card', style: 'text-align:center' }, '🎉 Nenhuma foto por decidir'));
+  list.forEach(a => {
+    const l = localById(a.local_id) || {}, sug = (a.crianca || a.recusado) ? 'nao' : 'pub', dec = {};
+    a.fotos.forEach(f => { dec[f.id] = sug; });
+    const rows = a.fotos.map((f, i) => {
+      const seg = h('div', { class: 'seg', style: 'flex:1' }, ...[['pub', 'Publicar'], ['nao', 'Não publicar']].map(([v, t]) => h('button', { type: 'button', class: dec[f.id] === v ? 'on' : '', onclick: e => { dec[f.id] = v; [...seg.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); } }, t)));
+      return h('div', { class: 'row', style: 'padding:8px 0;border-bottom:1px solid var(--line);gap:10px' }, h('a', { href: f.url, target: '_blank', rel: 'noopener', style: 'font-weight:700;white-space:nowrap' }, `Foto ${i + 1} ↗`), seg);
+    });
+    const guardar = async e => {
+      const b = e.currentTarget; b.disabled = true;
+      try { await API.decidirFotos(a.aula_id, a.fotos.filter(f => dec[f.id] === 'pub').map(f => f.id), a.fotos.filter(f => dec[f.id] === 'nao').map(f => f.id)); }
+      catch (err) { toast(err.server ? err.message : 'Sem ligação ao servidor.'); b.disabled = false; return; }
+      S.d.fotosPend = S.d.fotosPend.filter(x => x.aula_id !== a.aula_id); toast('Decisão guardada ✓'); render();
+    };
+    el.append(h('div', { class: 'card' }, h('b', {}, `${l.nome || ''} · ${DIAS[dow(a.data)]} ${fmtShort(a.data)} · ${a.hora_inicio}`), h('div', { class: 'mut cap' }, `${(profById(a.prof_deu_id) || {}).nome || ''} · ${a.fotos.length} foto(s)`),
+      a.crianca ? h('div', { style: 'margin-top:6px' }, h('span', { class: 'chip warn' }, 'Crianças presentes · sugestão: não publicar')) : null,
+      a.recusado ? h('div', { style: 'margin-top:6px' }, h('span', { class: 'chip bad' }, 'Há aluno que recusou fotografias · confirme antes de publicar')) : null,
+      h('div', { style: 'margin-top:8px' }, ...rows), h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: guardar }, 'Guardar decisão')));
+  });
+  return el;
+}
+/* N2: pedidos do funcionário sobre alunos (novo, alteração, passar a inativo). Nada se apaga. */
+const CAMPO_LBL = { nome: 'Nome', genero: 'Género', contacto: 'Contacto', data_nascimento: 'Nascimento', grupo_id: 'Grupo', local_id: 'Local', crianca: 'Idade', ativo: 'Estado' };
+function campoTxt(k, v) {
+  if (k === 'genero') return v === 'H' ? 'Homem' : v === 'M' ? 'Mulher' : v;
+  if (k === 'crianca') return v === 'sim' ? 'Criança (menor)' : 'Adulto';
+  if (k === 'ativo') return v === 'nao' ? 'Passa a inativo' : 'Ativo';
+  if (k === 'grupo_id') return v ? ((grupoById(v) || {}).nome || v) : 'Sem grupo';
+  if (k === 'local_id') return (localById(v) || {}).nome || v;
+  if (k === 'data_nascimento') return v ? fmtShort(v) : '—';
+  return v || '—';
+}
+function viewAlteracoes() {
+  const el = h('div'), list = S.d.alteracoes || [];
+  el.append(h('p', { class: 'mut cap', style: 'margin-top:0' }, 'Pedidos dos funcionários das instituições. Só passam a valer depois de aprovados. Nunca se apaga nenhum aluno.'));
+  if (!list.length) el.append(h('div', { class: 'card', style: 'text-align:center' }, '🎉 Nenhum pedido por decidir'));
+  list.forEach(p => {
+    const l = localById(p.local_id) || {}, d = p.dados || {}, act = async ok => {
+      try { await API.decidirAlteracao(p.id, ok); } catch (e) { toast(e.server ? e.message : 'Sem ligação ao servidor.'); return; }
+      S.d.alteracoes = S.d.alteracoes.filter(x => x.id !== p.id); toast(ok ? 'Pedido aprovado ✓' : 'Pedido rejeitado');
+      if (ok) { try { await reloadAll(); } catch (e) { render(); } } else render();
+    };
+    const linhas = Object.keys(d).filter(k => CAMPO_LBL[k]).map(k => h('div', { class: 'mut cap' }, `${CAMPO_LBL[k]}: ${campoTxt(k, d[k])}`));
+    if (d.rgpd_assinatura_id) linhas.push(h('div', { class: 'mut cap' }, 'RGPD: ' + (d.rgpdModo === 'testemunha' ? 'confirmado por testemunha' : 'assinado')));
+    else if (d.rgpd_estado) linhas.push(h('div', { class: 'mut cap' }, 'RGPD: ' + (d.rgpd_estado === 'recusado' ? 'recusado' : 'fica pendente')));
+    el.append(h('div', { class: 'card' }, h('div', { class: 'row-between' }, h('b', {}, (p.tipo === 'novo' ? 'Novo aluno · ' : 'Alteração · ') + (p.nome || p.nome_atual)), h('span', { class: 'chip rgpd' }, l.nome || '')),
+      h('div', { class: 'mut cap' }, `Pedido de ${p.pedido_por || ''} · ${fmtShort(String(p.criado_em).slice(0, 10))}`), ...linhas,
+      h('div', { style: 'display:flex;gap:8px;margin-top:10px' }, h('button', { class: 'btn small ok', style: 'flex:1', onclick: () => act(true) }, 'Aprovar'), h('button', { class: 'btn small bad', style: 'flex:1', onclick: () => act(false) }, 'Rejeitar'))));
+  });
   return el;
 }
 function viewAprov() {
@@ -1055,7 +1143,7 @@ function rgpdText(crianca, temFoto) {
 function alunoModal(a, opt) {
   const d = Object.assign({ nome: '', genero: '', contacto: '', data_nascimento: '', foto_mini: '', ativo: 'sim', local_id: opt.localId || '', grupo_id: opt.grupoId || '' }, a || {});
   let genero = d.genero, foto = d.foto_mini, crianca = d.crianca === 'sim', rgpdSig = null;
-  const seeData = !a || isGestor();
+  const seeData = !a || isGestor() || isFunc();
   const nome = h('input', { class: 'in', placeholder: 'Nome completo', value: d.nome, autocomplete: 'off' });
   const seg = h('div', { class: 'seg' }, ...[['M', 'Mulher'], ['H', 'Homem']].map(([v, l]) => h('button', { type: 'button', class: genero === v ? 'on' : '', onclick: e => { genero = v; [...seg.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); } }, l)));
   const av = h('div', { style: 'display:flex;align-items:center;gap:14px' });
@@ -1101,7 +1189,7 @@ function alunoModal(a, opt) {
           : h('p', { class: 'mut', style: 'margin:6px 0 0' }, 'Ainda sem registos de presença.'));
     }).catch(() => histBox.replaceChildren(h('span', { class: 'mut' }, 'Não consegui carregar as presenças (sem ligação).')));
   }
-  const s = openSheet(a ? 'Aluno' : 'Novo aluno', av, file, a ? histBox : null,
+  const s = openSheet(a ? 'Aluno' : 'Novo aluno', av, file, a ? histBox : null, isFunc() ? h('p', { class: 'cap', style: 'margin:0 0 8px' }, 'Isto fica como pedido: só passa a valer depois de o gestor aprovar.') : null,
     h('label', { class: 'l' }, 'Nome completo'), nome, h('label', { class: 'l' }, 'Género (conta para os totais)'), seg, h('label', { class: 'l' }, 'Idade'), kidSeg,
     opt.fixed ? null : [h('label', { class: 'l' }, 'Local'), localSel, h('label', { class: 'l' }, 'Grupo'), grupoSel],
     seeData ? h('details', { style: 'margin-top:14px' }, h('summary', { style: 'font-weight:700;padding:8px 0' }, 'Contacto e data de nascimento (podem ficar para depois)'), h('label', { class: 'l' }, 'Contacto'), contacto, h('label', { class: 'l' }, 'Data de nascimento'), nasc, a ? null : h('p', { class: 'mut cap' }, 'Depois de guardados, só o gestor os vê. O professor recebe apenas o aviso de aniversário.')) : null,
@@ -1624,6 +1712,7 @@ function applyBoot(r) {
   S.d = { projetos: r.projetos || [], locais: r.locais || [], grupos: r.grupos || [], professores: r.professores || [], alunos: r.alunos || [], atrib: r.atrib || [], semAulas: r.semAulas || [], aulas: r.aulas || [], aprovacoes: r.aprovacoes || [], gestao: r.gestao || null };
   ordenaDados();
   S.d.pedidos = r.pedidos || [];
+  S.d.fotosPend = r.fotosPend || []; S.d.alteracoes = r.alteracoes || [];
   S.me = r.me ? Object.assign({}, S.d.professores.find(p => p.id === r.me.id) || {}, r.me) : null;
   lastBoot = Date.now();
 }
