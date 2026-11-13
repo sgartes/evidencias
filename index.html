@@ -1635,7 +1635,7 @@ function viewRegistos() {
     if (!isGestor() || st.all || st.scope !== 'local' || !st.localId) return;
     let r; try { r = await API.aulasAnuladas(st.localId, st.ym); } catch (e) { return; }
     const as = (r && r.aulas) || []; if (!as.length) return;
-    anuBox.replaceChildren(h('h3', { style: 'margin:18px 0 6px;font-size:14px;color:#665A53' }, 'Anuladas (' + as.length + ')'), ...as.map(x => h('button', { class: 'card row', style: 'margin-bottom:8px;width:100%;text-align:left;opacity:.65', onclick: () => anuladaModal(x, () => again()) }, h('div', { class: 'grow' }, h('b', {}, `${DIAS[dow(x.data)]} ${fmtShort(x.data)} \u00b7 ${x.hora_inicio}`), h('div', { class: 'mut cap' }, `${x.homens} H \u00b7 ${x.mulheres} M \u00b7 anulada`)))));
+    anuBox.replaceChildren(h('h3', { style: 'margin:18px 0 6px;font-size:14px;color:#665A53' }, 'Anuladas (' + as.length + ')'), ...as.map(x => h('button', { class: 'card row', style: 'margin-bottom:8px;width:100%;text-align:left;background:#D6D2CF;color:#000', onclick: () => anuladaModal(x, () => again()) }, h('div', { class: 'grow' }, h('b', {}, `${DIAS[dow(x.data)]} ${fmtShort(x.data)} \u00b7 ${x.hora_inicio}`), h('div', { class: 'cap', style: 'color:#000' }, `${x.homens} H \u00b7 ${x.mulheres} M \u00b7 anulada`)))));
   }
   async function load() {
     list.replaceChildren(h('p', { class: 'mut' }, 'A carregar…'));
@@ -1878,7 +1878,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.14';
+const BUILD = 'v2.15';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
