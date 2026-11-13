@@ -387,6 +387,15 @@ const API = {
     if (IS_GS) return gs('apiPresencas', id);
     const a = DEMO.aulas.find(z => z.id === id) || {}; return { ok: true, presencas: (a.presencas || []).map(x => Object.assign({ nome: (DEMO.alunos.find(z => z.id === x.alunoId) || {}).nome }, x)) };
   },
+  async eliminarAula(id, motivo) {
+    if (IS_GS) return gs('apiEliminarAula', id, motivo);
+    const i = DEMO.aulas.findIndex(z => z.id === id); if (i >= 0) DEMO.aulas.splice(i, 1);
+    return { ok: true };
+  },
+  async aulaFotos(id) {
+    if (IS_GS) return gs('apiAulaFotos', id);
+    return { ok: true, fotos: [] };
+  },
   async anularAula(id, motivo) {
     if (IS_GS) return gs('apiAnularAula', id, motivo);
     const a = DEMO.aulas.find(z => z.id === id); if (a) { a.estado = 'anulada'; a.observacoes = (a.observacoes ? a.observacoes + ' ' : '') + `[Anulada: ${motivo}]`; } await kv.set('demo', DEMO); return { ok: true };
@@ -1190,7 +1199,7 @@ function alunoModal(a, opt) {
   const file = h('input', { type: 'file', accept: 'image/*', capture: 'user', hidden: true, onchange: async e => { if (e.target.files[0]) { try { foto = await squareThumb(e.target.files[0], 160); paintAv(); } catch (err) { toast(err.message); } } } });
   paintAv(); paintRgpd();
   const kidSeg = h('div', { class: 'seg' }, ...[['nao', 'Adulto'], ['sim', 'Criança (menor)']].map(([v, l]) => h('button', { type: 'button', class: (crianca ? 'sim' : 'nao') === v ? 'on' : '', onclick: e => { crianca = v === 'sim'; [...kidSeg.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); paintAv(); if (!RGPD_OK.includes(d.rgpd_estado)) paintRgpd(); } }, l)));
-  const localSel = h('select', { class: 'in' }, ...optsLocais()); localSel.value = d.local_id || (S.d.locais[0] || {}).id;
+  const localSel = localPick(); localSel.value = d.local_id || (S.d.locais[0] || {}).id;
   const grupoSel = h('select', { class: 'in' });
   const fillGrupos = () => { grupoSel.replaceChildren(h('option', { value: '' }, 'Sem grupo (aparece em todos os grupos do local)'), ...S.d.grupos.filter(g => g.local_id === localSel.value).map(g => h('option', { value: g.id }, `${DIAS[Number(g.dia)] || ''} ${g.hora_inicio} · ${g.nome || ''}`))); grupoSel.value = d.grupo_id && S.d.grupos.some(g => g.id === d.grupo_id && g.local_id === localSel.value) ? d.grupo_id : ''; };
   localSel.addEventListener('change', () => { d.grupo_id = ''; fillGrupos(); }); fillGrupos();
@@ -1566,7 +1575,7 @@ function viewAlunos() {
       avatar(a), h('div', { class: 'grow' }, h('b', {}, a.nome), h('div', { class: 'mut cap' }, `${a.genero === 'H' ? 'Homem' : a.genero === 'M' ? 'Mulher' : 'Género por indicar'} · ${a.grupo_id ? ((grupoById(a.grupo_id) || {}).nome || 'grupo') : 'sem grupo'}${a.ativo === 'nao' ? ' · inativo' : ''}`))))
       : [h('p', { class: 'mut' }, 'Nenhum aluno encontrado.')]));
   };
-  const sel = h('select', { class: 'in', onchange: e => { st.localId = e.target.value; paint(); } }, h('option', { value: '' }, 'Todos os locais'), ...optsLocais()); sel.value = st.localId;
+  const sel = localPick({ all: true, onchange: e => { st.localId = e.target.value; paint(); } }); sel.value = st.localId;
   el.append(h('h1', {}, 'Alunos'),
     h('button', { class: 'btn primary', onclick: () => alunoModal(null, { localId: st.localId, onSave: saveAlunoEdit }) }, '＋ Novo aluno'), h('div', { style: 'height:12px' }), sel, h('div', { style: 'height:8px' }),
     h('input', { class: 'in', placeholder: 'Procurar por nome', value: st.q, oninput: e => { st.q = e.target.value; paint(); } }), h('div', { style: 'height:12px' }), list);
@@ -1596,7 +1605,7 @@ function viewRegistos() {
   const periodLabel = () => st.all ? 'Todo o período' : `${cap(MESES[Number(st.ym.slice(5)) - 1])} ${st.ym.slice(0, 4)}`;
   const again = () => render();
   const seg = h('div', { class: 'seg' }, ...[['local', 'Um local'], ['projeto', 'Um projeto'], ['todos', 'Tudo']].map(([v, l]) => h('button', { class: st.scope === v ? 'on' : '', onclick: () => { st.scope = v; again(); } }, l)));
-  const sel = st.scope === 'local' ? h('select', { class: 'in', onchange: e => { st.localId = e.target.value; again(); } }, ...optsLocais())
+  const sel = st.scope === 'local' ? localPick({ onchange: e => { st.localId = e.target.value; again(); } })
     : st.scope === 'projeto' ? h('select', { class: 'in', onchange: e => { st.projetoId = e.target.value; again(); } }, ...optsProjetos()) : null;
   if (sel) sel.value = st.scope === 'local' ? st.localId : st.projetoId;
   const label = h('b', { style: 'flex:1;text-align:center;font-size:16px' }, periodLabel()), list = h('div'), actions = h('div');
@@ -1662,13 +1671,41 @@ async function aulaModal(x, reload) {
   const presBox = h('div', { class: 'namechips' });
   const paintPres = () => presBox.replaceChildren(...pres.map(p => h('button', { class: 'namechip', style: p.presente ? 'background:var(--ok-l);color:var(--ok)' : 'background:var(--bad-l);color:var(--bad)', onclick: () => { p.presente = !p.presente; paintPres(); } }, (p.presente ? '✓ ' : '✗ ') + (p.nome || (alunoById(p.alunoId) || {}).nome || p.alunoId))));
   if (pres) paintPres();
-  const s = openSheet('Corrigir aula', head,
-    h('label', { class: 'l', style: 'margin-top:0' }, 'Hora de início'), timeIn, h('label', { class: 'l' }, 'Duração (minutos)'), durIn,
+  const gest = isGestor(), rem = new Set(), novas = [];
+  let dateIn, grupoSel, profSel, fotosBox, fotos = [];
+  const gestorBox = [];
+  if (gest) {
+    dateIn = h('input', { class: 'in', type: 'date', value: x.data, style: 'width:auto' });
+    grupoSel = h('select', { class: 'in' }, ...S.d.grupos.map(gg => h('option', { value: gg.id }, ((localById(gg.local_id) || {}).nome || '') + ' \u00b7 ' + (gg.nome || '') + ' \u00b7 ' + (DIAS[gg.dia] || '') + ' ' + (gg.hora_inicio || '')))); grupoSel.value = x.grupo_id;
+    profSel = h('select', { class: 'in' }, ...S.d.professores.map(p => h('option', { value: p.id }, p.nome))); profSel.value = x.prof_deu_id;
+    try { fotos = (await API.aulaFotos(x.id)).fotos || []; } catch (e) { }
+    fotosBox = h('div', {});
+    const fileIn = h('input', { type: 'file', accept: 'image/*', multiple: true, hidden: true, onchange: async e => { for (const f of e.target.files) { try { novas.push(await shrink(f, 1600, 0.82)); } catch (err) { toast(err.message); } } e.target.value = ''; paintF(); } });
+    const paintF = () => fotosBox.replaceChildren(
+      ...fotos.map((u, i) => h('div', { style: 'display:flex;gap:10px;align-items:center;margin:4px 0' }, h('a', { href: u, target: '_blank', class: 'link', style: 'flex:1;' + (rem.has(u) ? 'text-decoration:line-through;opacity:.5' : '') }, 'Foto ' + (i + 1)), h('button', { type: 'button', class: 'link', onclick: () => { if (rem.has(u)) rem.delete(u); else rem.add(u); paintF(); } }, rem.has(u) ? 'Desfazer' : 'Retirar'))),
+      ...(novas.length ? [h('p', { class: 'mut', style: 'margin:4px 0' }, novas.length + ' foto(s) a acrescentar')] : []),
+      h('button', { type: 'button', class: 'link', onclick: () => fileIn.click() }, '+ Acrescentar foto'), fileIn);
+    paintF();
+    gestorBox.push(h('label', { class: 'l', style: 'margin-top:0' }, 'Data da aula'), dateIn, h('label', { class: 'l' }, 'Turma'), grupoSel, h('label', { class: 'l' }, 'Professor que deu a aula'), profSel, h('label', { class: 'l' }, 'Fotos'), fotosBox);
+  }
+  const elimBtn = h('button', { class: 'btn bad', style: 'margin-top:10px', onclick: () => {
+    const motivo = h('textarea', { class: 'in', placeholder: 'Motivo (opcional)' });
+    const c = openSheet('Eliminar o registo', h('p', { class: 'mut', style: 'margin-top:0' }, 'O registo desta aula \u00e9 eliminado de vez, com as presen\u00e7as. As fotos n\u00e3o se apagam: ficam na pasta Removidas do Drive. Fica registado quem eliminou. Se s\u00f3 queres tirar a aula das folhas e dos pagamentos, usa Anular esta aula.'), motivo,
+      h('button', { class: 'btn bad', style: 'margin-top:12px', onclick: async () => {
+        try { await API.eliminarAula(x.id, motivo.value.trim()); } catch (e) { toast(e.server ? e.message : 'Sem liga\u00e7\u00e3o. Eliminar precisa de rede.'); return; }
+        const i = S.d.aulas.findIndex(z => z.id === x.id); if (i >= 0) S.d.aulas.splice(i, 1);
+        for (let k = S.recent.length - 1; k >= 0; k--) if (S.recent[k].aulaId === x.id) S.recent.splice(k, 1);
+        await saveRecent(); c.close(); s.close(); toast('Registo eliminado'); reload();
+      } }, 'Eliminar definitivamente'));
+  } }, 'Eliminar o registo');
+  const s = openSheet('Corrigir aula', head, ...gestorBox,
+    h('label', { class: 'l', style: gest ? '' : 'margin-top:0' }, 'Hora de início'), timeIn, h('label', { class: 'l' }, 'Duração (minutos)'), durIn,
     pres ? [h('label', { class: 'l' }, 'Presenças (toca para mudar)'), presBox] : [h('label', { class: 'l' }, 'Homens · Mulheres'), h('div', { style: 'display:flex;gap:10px' }, num(st.h, 'h'), num(st.m, 'm'))],
     h('label', { class: 'l' }, 'Observações'), obs,
     h('button', { class: 'btn primary', style: 'margin-top:16px', onclick: async () => {
       const patch = { inicio: timeIn.value || st.inicio, duracaoMin: Number(durIn.value) || st.dur, observacoes: obs.value.trim() };
       if (pres) patch.presencas = pres.map(p => ({ alunoId: p.alunoId, presente: !!p.presente })); else { patch.homens = st.h; patch.mulheres = st.m; }
+      if (gest) { patch.data = dateIn.value; patch.grupoId = grupoSel.value; patch.profId = profSel.value; patch.removerFotos = [...rem]; patch.novasFotos = novas; }
       try { await API.editAula(x.id, patch); } catch (e) { toast(e.server ? e.message : 'Sem ligação. Corrigir aulas precisa de rede.'); return; }
       s.close(); toast('Aula corrigida ✓'); reload();
     } }, 'Guardar correção'),
@@ -1682,7 +1719,7 @@ async function aulaModal(x, reload) {
           S.recent.forEach(r => { if (r.aulaId === x.id) r.estado = 'anulada'; }); await saveRecent();
           c.close(); s.close(); toast('Aula anulada'); reload();
         } }, 'Anular aula'));
-    } }, 'Anular esta aula'));
+    } }, 'Anular esta aula'), ...(gest ? [elimBtn] : []));
 }
 function pagamentosCard(ym) {
   const box = h('div', { class: 'card', style: 'margin-top:14px' }, h('b', { style: 'font-size:16.5px' }, isGestor() ? 'Pagamentos do mês' : 'O meu pagamento do mês'), h('p', { class: 'mut' }, 'A carregar…'));
@@ -1754,6 +1791,33 @@ function ordenaDados() {
 function projLabel(p) { return p ? (p.nome || '') + (p.programa ? ' (' + p.programa + ')' : '') : ''; }
 function optsProjetos() { const g = {}; S.d.projetos.forEach(p => { const k = p.entidade || 'Sem entidade'; (g[k] = g[k] || []).push(p); }); return Object.keys(g).map(k => h('optgroup', { label: k }, ...g[k].map(p => h('option', { value: p.id }, projLabel(p))))); }
 function optsLocais() { const g = {}; S.d.locais.forEach(l => { const p = S.d.projetos.find(x => x.id === l.projeto_id) || {}; const k = (p.entidade ? p.entidade + ' · ' : '') + (p.nome || 'Sem projeto'); (g[k] = g[k] || []).push(l); }); return Object.keys(g).map(k => h('optgroup', { label: k }, ...g[k].map(l => h('option', { value: l.id }, l.nome)))); }
+function localPick(o) {
+  o = o || {}; let val = '';
+  const btn = h('button', { type: 'button', class: 'in', style: 'text-align:left;cursor:pointer;display:block;width:100%' });
+  const paint = () => {
+    const l = localById(val), p = l ? (projById(l.projeto_id) || {}) : {};
+    btn.replaceChildren(h('b', {}, l ? l.nome : (o.all ? 'Todos os locais' : 'Escolher local')), ...(l ? [h('div', { class: 'mut', style: 'font-size:12px;font-weight:400' }, [p.entidade, p.nome].filter(Boolean).join(' \u00b7 '))] : []));
+  };
+  Object.defineProperty(btn, 'value', { get: () => val, set: v => { val = v || ''; paint(); } });
+  const norm = s => String(s || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  btn.onclick = () => {
+    const q = h('input', { class: 'in', type: 'search', placeholder: 'Pesquisar local, entidade ou projeto' }), list = h('div', {});
+    let sh;
+    const pickV = v => { val = v; paint(); sh.close(); if (o.onchange) o.onchange({ target: btn }); };
+    const row = (txt, v) => h('button', { type: 'button', style: 'display:block;width:100%;text-align:left;background:' + (v === val ? '#FFF0EA' : 'none') + ';border:0;border-bottom:1px solid #eee;padding:12px 6px;font:inherit;cursor:pointer;color:inherit', onclick: () => pickV(v) }, h('b', {}, txt));
+    const paintL = () => {
+      const t = norm(q.value), kids = [], g = {};
+      if (o.all && !t) kids.push(row('Todos os locais', ''));
+      S.d.locais.forEach(l => { const p = projById(l.projeto_id) || {}; if (t && !norm(l.nome + ' ' + p.entidade + ' ' + p.nome).includes(t)) return; const k = (p.entidade || '') + '|' + (p.nome || ''); (g[k] = g[k] || { p, ls: [] }).ls.push(l); });
+      Object.keys(g).forEach(k => { const e = g[k]; kids.push(h('div', { style: 'margin:16px 0 0;font-size:12px;font-weight:700;color:#665A53;text-transform:uppercase;letter-spacing:.04em' }, e.p.entidade || 'Sem entidade'), h('div', { class: 'mut', style: 'font-size:12px;margin-bottom:2px' }, projLabel(e.p))); e.ls.forEach(l => kids.push(row(l.nome, l.id))); });
+      if (!Object.keys(g).length) kids.push(h('p', { class: 'mut' }, 'Nada encontrado.'));
+      list.replaceChildren(...kids);
+    };
+    q.oninput = paintL; paintL();
+    sh = openSheet('Escolher local', q, list);
+  };
+  paint(); return btn;
+}
 function marcaAgua() {
   const quem = String((S.me && S.me.nome) || '').replace(/[&<>'"]/g, ''), txt = 'Só para visualização · ' + quem + ' · ' + fmtShort(today());
   const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='360' height='170'><text x='12' y='95' transform='rotate(-18 180 85)' font-family='Arial' font-size='15' fill='rgba(201,67,26,0.22)'>" + txt + '</text></svg>';
@@ -1785,7 +1849,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.12';
+const BUILD = 'v2.13';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
