@@ -395,6 +395,10 @@ const API = {
     if (IS_GS) return gs('apiRestaurarAula', id);
     return { ok: true };
   },
+  async eliminarAluno(id, confirmar) {
+    if (IS_GS) return gs('apiEliminarAluno', id, confirmar);
+    return { ok: true, pode: true, bloqueios: [], abreviado: '' };
+  },
   async eliminarAula(id, motivo) {
     if (IS_GS) return gs('apiEliminarAula', id, motivo);
     const i = DEMO.aulas.findIndex(z => z.id === id); if (i >= 0) DEMO.aulas.splice(i, 1);
@@ -1248,7 +1252,7 @@ function alunoModal(a, opt) {
       }
       if (!RGPD_OK.includes(out.rgpd_estado)) out.foto_mini = '';
       s.close(); await opt.onSave(out);
-    } }, 'Guardar'));
+    } }, 'Guardar'), ...(a && isGestor() ? [h('button', { class: 'btn bad', style: 'margin-top:10px', onclick: () => eliminarAlunoModal(a, s) }, 'Eliminar dados pessoais…')] : []));
   if (!a) setTimeout(() => nome.focus(), 60);
 }
 
@@ -1485,6 +1489,7 @@ async function postModal(rec) {
    ===================================================================== */
 const DIAS_LONGOS = ['', 'Segunda-feira', 'Terça-feira', 'Quarta-feira', 'Quinta-feira', 'Sexta-feira', 'Sábado', 'Domingo'];
 const SIMNAO = () => [['sim', 'Sim'], ['nao', 'Não']];
+const ESTADOS_PROJ = () => [['ativo', 'Ativo'], ['relatorio_entregue', 'Relatório entregue'], ['encerrado', 'Encerrado']];
 const GE = {
   locais: {
     tab: 'Locais', titulo: 'Locais', novo: 'Novo local',
@@ -1530,6 +1535,7 @@ const GE = {
     fields: () => [
       { k: 'nome', l: 'Nome do projeto' }, { k: 'programa', l: 'Programa' }, { k: 'entidade', l: 'Entidade financiadora' },
       { k: 'data_inicio', l: 'Início do período', type: 'date' }, { k: 'data_fim', l: 'Fim do período', type: 'date', help: 'Aulas fora destas datas ficam a aguardar a tua aprovação.' },
+      { k: 'estado', l: 'Estado do projeto', type: 'select', opts: ESTADOS_PROJ, def: 'ativo', help: 'Só se podem eliminar dados pessoais de alunos quando todos os projetos que frequentaram estão Encerrados.' },
       { k: 'formulario_url', l: 'Link do formulário (https://…)', type: 'url' },
       { k: 'entidade_email', l: 'Email da entidade', type: 'email', help: 'Recebe um aviso quando um professor regista uma aula não prevista. Vazio = não envia nada.' },
       { k: 'post_publico', l: 'Publicações públicas nas redes?', type: 'select', opts: SIMNAO, def: 'nao', help: 'Para projetos com crianças, deixa em Não.' },
@@ -1625,7 +1631,7 @@ function viewRegistos() {
       const hh = e.aulas.reduce((n, x) => n + Number(x.homens), 0), mm = e.aulas.reduce((n, x) => n + Number(x.mulheres), 0);
       if (st.all || st.scope !== 'local') return h('button', { class: 'card row', style: 'margin-bottom:8px;width:100%;text-align:left', onclick: () => { st.scope = 'local'; st.localId = e.loc.id; st.all = false; again(); } }, h('div', { class: 'grow' }, h('b', {}, e.loc.nome), h('div', { class: 'mut cap' }, `${e.aulas.length} aula(s) · ${hh} H · ${mm} M`)), h('span', { class: 'mut' }, '\u203a'));
       return e.aulas.length || (e.feriados || []).length ? [...(e.feriados || []).map(f => h('div', { class: 'card row', style: 'margin-bottom:8px' }, h('div', { class: 'grow' }, h('b', {}, `${DIAS[dow(f.data)]} ${fmtShort(f.data)} · ${f.tipo === 'feriado' ? 'feriado' : 'sem aula'}`), h('div', { class: 'mut cap' }, (f.tipo === 'feriado' ? '' : (f.motivo || '') + ' · ') + 'consta na folha, sem assinaturas')))), ...e.aulas.map(x => h('button', { class: 'card row', style: 'margin-bottom:8px;width:100%;text-align:left', onclick: () => x.pendente ? toast('Esta aula ainda não seguiu para o servidor.') : aulaModal(x, () => render()) }, h('div', { class: 'grow' }, h('b', {}, `${DIAS[dow(x.data)]} ${fmtShort(x.data)} · ${x.hora_inicio}`), h('div', { class: 'mut cap' }, `${(profById(x.prof_deu_id) || {}).nome || ''}${x.nome_resp ? ' · assinou ' + x.nome_resp : x.pendente ? '' : ' · por assinar'}`)),
-        h('div', { style: 'text-align:right' }, h('b', {}, Number(x.homens) + Number(x.mulheres)), h('div', { class: 'mut cap' }, `${x.homens} H · ${x.mulheres} M`)), x.pendente ? h('span', { class: 'chip warn' }, 'por enviar') : null))] : h('div', { class: 'card mut' }, 'Sem aulas neste período.');
+        h('div', { style: 'text-align:right' }, h('b', {}, Number(x.homens) + Number(x.mulheres)), h('div', { class: 'mut cap' }, `${x.homens} H · ${x.mulheres} M`)), x.pendente ? h('span', { class: 'chip warn' }, 'por enviar') : null))] : h('div', { class: 'card' }, h('p', { class: 'mut', style: 'margin:0 0 10px' }, 'Sem aulas neste período.'), ...(st.all ? [] : [h('button', { class: 'btn ghost', onclick: () => shift(-1) }, 'Ver o mês anterior')]));
     }));
     actions.replaceChildren(h('p', { class: 'mut' }, `${tot.n} aula(s) · ${tot.h} homens · ${tot.m} mulheres`), h('button', { class: 'btn primary', disabled: tot.n || st.scope === 'local' || st.data.some(e => (e.feriados || []).length) ? null : true, onclick: folhaPreview }, 'Ver folhas de presença'));
   };
@@ -1847,6 +1853,12 @@ function anuladaModal(x, done) {
         } }, 'Eliminar definitivamente'));
     } }, 'Eliminar o registo'));
 }
+async function eliminarAlunoModal(a, ps) {
+  let r; try { r = await API.eliminarAluno(a.id, false); } catch (e) { toast(e.server ? e.message : 'Sem liga\u00e7\u00e3o.'); return; }
+  if (!r.pode) { openSheet('Eliminar dados pessoais', h('p', { class: 'mut', style: 'margin-top:0' }, 'Ainda n\u00e3o \u00e9 poss\u00edvel. ' + a.nome + ' frequentou projetos que n\u00e3o est\u00e3o encerrados:'), h('p', {}, (r.bloqueios || []).join(', ')), h('p', { class: 'mut cap' }, 'Depois de a entidade aprovar o relat\u00f3rio, marca o projeto como Encerrado em Gest\u00e3o \u2192 Projetos.')); return; }
+  const c = openSheet('Eliminar dados pessoais', h('p', { class: 'mut', style: 'margin-top:0' }, 'Vais apagar de vez o contacto, a data de nascimento, a fotografia e a assinatura RGPD de ' + a.nome + '. Nas presen\u00e7as fica s\u00f3 o nome abreviado (' + (r.abreviado || '') + ') para os totais baterem. O aluno fica inativo. N\u00e3o se pode desfazer.'),
+    h('button', { class: 'btn bad', onclick: async () => { try { await API.eliminarAluno(a.id, true); } catch (e) { toast(e.server ? e.message : 'Sem liga\u00e7\u00e3o.'); return; } c.close(); if (ps) ps.close(); toast('Dados eliminados'); try { await refreshData(); } catch (e) { } render(); } }, 'Eliminar definitivamente'));
+}
 function marcaAgua() {
   const quem = String((S.me && S.me.nome) || '').replace(/[&<>'"]/g, ''), txt = 'Só para visualização · ' + quem + ' · ' + fmtShort(today());
   const svg = "<svg xmlns='http://www.w3.org/2000/svg' width='360' height='170'><text x='12' y='95' transform='rotate(-18 180 85)' font-family='Arial' font-size='15' fill='rgba(201,67,26,0.22)'>" + txt + '</text></svg>';
@@ -1878,7 +1890,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.15';
+const BUILD = 'v2.16';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
