@@ -884,6 +884,22 @@ function atribuirModal(g, date) {
       s.close(); toast('Aula atribuída ✓'); render();
     } }, 'Atribuir aula'));
 }
+function avisoTexto(g, date, tipo, motivo) {
+  const loc = localById(g.local_id) || {}, quando = DIAS[dow(date)] + ', ' + fmtShort(date) + ', às ' + g.hora_inicio, onde = g.nome || loc.nome || '';
+  if (tipo === 'cancelada') return 'Olá! A aula de ' + quando + ' (' + onde + ') não se vai realizar.' + (motivo ? ' Motivo: ' + motivo + '.' : '') + ' Pedimos desculpa pelo incómodo. SGArtes';
+  if (tipo === 'alterada') return 'Olá! Alteração na aula de ' + quando + ' (' + onde + '): [escreve aqui a alteração]. SGArtes';
+  return 'Olá! Lembramos que há aula de dança ' + quando + ' (' + onde + '). Contamos convosco! SGArtes';
+}
+function avisarModal(g, date, tipo, motivo) {
+  let t = tipo || 'cancelada';
+  const ta = h('textarea', { class: 'in', rows: '6', style: 'min-height:130px' }), seg = h('div', { class: 'seg' });
+  const paint = () => { seg.replaceChildren(...[['cancelada','Cancelada'],['alterada','Alterada'],['lembrete','Lembrete']].map(([v, l]) => h('button', { class: t === v ? 'on' : '', onclick: () => { t = v; ta.value = avisoTexto(g, date, t, motivo); paint(); } }, l))); };
+  ta.value = avisoTexto(g, date, t, motivo); paint();
+  const link = g.whatsapp_link || '';
+  openSheet('Avisar a turma por WhatsApp', h('p', { class: 'mut', style: 'margin-top:0' }, link ? 'O texto é copiado e abre-se o grupo da turma: cola e envia.' : 'Escolhe no WhatsApp a conversa ou o grupo e envia. Podes guardar o link do grupo da turma em Gestão → Turmas.'), seg, ta,
+    h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: () => { const m = ta.value; if (link) { copyText(m); toast('Texto copiado. Cola no grupo.'); window.open(link, '_blank'); } else { window.open('https://wa.me/?text=' + encodeURIComponent(m), '_blank'); } } }, 'Abrir o WhatsApp'),
+    h('button', { class: 'btn ghost', style: 'margin-top:10px', onclick: async () => toast((await copyText(ta.value)) ? 'Texto copiado ✓' : 'Não consegui copiar. Seleciona o texto e copia.') }, 'Só copiar o texto'));
+}
 function semAulaModal(g, date) {
   const loc = localById(g.local_id), ferNome = feriado(date); let mode = 'motivo', isFer = !!ferNome, sig = null; const needP = !S.me.assinatura;
   const motivo = h('textarea', { class: 'in', style: 'min-height:80px' });
@@ -907,6 +923,7 @@ function semAulaModal(g, date) {
       if (needP && !sig) { toast('Assina primeiro.'); return; }
       const p = { idCliente: uid(), grupoId: g.id, localId: g.local_id, data: date, tipo: mode === 'nao_prevista' ? 'nao_prevista' : (isFer ? 'feriado' : 'motivo'), motivo: motivo.value.trim(), assinaturaProf: needP ? sig : null };
       s.close(); saveSemAula(p);
+      if (p.tipo !== 'nao_prevista') setTimeout(() => avisarModal(g, date, 'cancelada', p.motivo), 400);
     } }, 'Registar'));
 }
 function lateItems() {
@@ -960,7 +977,7 @@ function nextCard(g) {
   const l = localById(g.local_id);
   return h('div', { class: 'card hero' }, h('div', { class: 'cap mut' }, 'Próxima aula'), h('div', { class: 'hero-t' }, l.nome), h('div', { class: 'mut' }, groupLine(g)),
     h('button', { class: 'btn primary', style: 'margin-top:14px', onclick: () => startFlow(g, today()) }, '📸 Enviar evidências'),
-    h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => semAulaModal(g, today()) }, 'Hoje não houve aula'), h('button', { class: 'link', onclick: () => atribuirModal(g, today()) }, 'Atribuir a outro professor')));
+    h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => semAulaModal(g, today()) }, 'Hoje não houve aula'), h('button', { class: 'link', onclick: () => avisarModal(g, today(), 'lembrete') }, 'Avisar a turma'), h('button', { class: 'link', onclick: () => atribuirModal(g, today()) }, 'Atribuir a outro professor')));
 }
 function classRow(g, date, subst) {
   const l = localById(g.local_id), done = closedFor(g.id, date), rec = done && S.recent.find(r => r.grupoId === g.id && r.data === date);
@@ -1474,7 +1491,8 @@ const GE = {
       { k: 'hora_inicio', l: 'Hora de início', type: 'time' },
       { k: 'duracao_min', l: 'Duração (minutos)', type: 'number', def: '60' },
       { k: 'com_lista', l: 'Chamada com lista de alunos?', type: 'select', opts: SIMNAO, def: 'nao', help: 'Não = só se contam homens e mulheres.' },
-      { k: 'ativo', l: 'Turma ativa?', type: 'select', opts: SIMNAO, def: 'sim', help: 'Turmas inativas deixam de aparecer no ecrã Hoje.' }]
+      { k: 'ativo', l: 'Turma ativa?', type: 'select', opts: SIMNAO, def: 'sim', help: 'Turmas inativas deixam de aparecer no ecrã Hoje.' },
+    { k: 'whatsapp_link', l: 'Link do grupo de WhatsApp (opcional)', help: 'Link de convite do grupo da turma (começa por https://chat.whatsapp.com/). Serve para avisar a turma com um toque.' }]
   },
   professores: {
     tab: 'Professores', titulo: 'Professores', novo: 'Novo professor',
