@@ -1588,19 +1588,19 @@ async function eliminarEntModal(sec, it, ps) {
   const spec = GE[sec]; let r;
   try { r = await API.eliminarEntidade(spec.tab, it.id, false); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); return; }
   const nm = spec.nome(it);
-  if (!r.pode) { openSheet('Eliminar', h('p', { class: 'mut', style: 'margin-top:0' }, 'Ainda não dá para eliminar «' + nm + '». Tem associado: ' + (r.bloqueios || []).join(', ') + '.'), h('p', { class: 'mut cap' }, 'Elimina ou muda primeiro o que está associado (aulas em Registos, alunos em Alunos). Se for só para retirar, marca como inativo.'), sec !== 'professores' ? h('button', { class: 'btn bad', style: 'margin-top:10px', onclick: () => eliminarCascataModal(sec, it, ps) }, 'Eliminar tudo em cascata…') : null); return; }
+  if (!r.pode) { const bs = openSheet('Eliminar', h('p', { class: 'mut', style: 'margin-top:0' }, 'Ainda não dá para eliminar «' + nm + '». Tem associado: ' + (r.bloqueios || []).join(', ') + '.'), h('p', { class: 'mut cap' }, 'Elimina ou muda primeiro o que está associado (aulas em Registos, alunos em Alunos). Se for só para retirar, marca como inativo.'), sec !== 'professores' ? h('button', { class: 'btn bad', style: 'margin-top:10px', onclick: () => eliminarCascataModal(sec, it, ps, () => bs.close()) }, 'Eliminar tudo em cascata…') : null); return; }
   const c = openSheet('Eliminar', h('p', { class: 'mut', style: 'margin-top:0' }, 'Vais eliminar «' + nm + '» de vez. Não se pode desfazer.'),
     h('button', { class: 'btn bad', onclick: async () => { try { await API.eliminarEntidade(spec.tab, it.id, true); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); return; } c.close(); if (ps) ps.close(); toast('Eliminado'); try { await reloadAll(); } catch (e) { } } }, 'Eliminar definitivamente'),
     h('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: () => c.close() }, 'Cancelar'));
 }
-async function eliminarCascataModal(sec, it, ps) {
+async function eliminarCascataModal(sec, it, ps, fecha2) {
   const spec = GE[sec]; let r;
   try { r = await API.eliminarCascata(spec.tab, it.id, false); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); return; }
   const q = r.resumo || {}, nm = r.nome || spec.nome(it);
   const lista = [['locais', 'local(is)'], ['turmas', 'turma(s)'], ['alunos', 'aluno(s), com os dados pessoais apagados de vez'], ['aulas', 'aula(s)'], ['presencas', 'presenças'], ['fotos', 'foto(s) (ficam na pasta Removidas do Drive)'], ['semAula', 'registo(s) de sem aula']].filter(([k]) => q[k] > 0).map(([k, l]) => h('li', {}, h('b', {}, String(q[k])), ' ' + l));
   if (q.mantidos > 0) lista.push(h('li', {}, h('b', {}, String(q.mantidos)), ' aluno(s) mantidos, porque têm presenças noutros projetos (ficam sem local nem turma, para os recolocares): ' + (q.mantidosNomes || []).join(', ')));
   const inp = h('input', { class: 'in', placeholder: 'Escreve o nome para confirmar', autocomplete: 'off' });
-  const btn = h('button', { class: 'btn bad', disabled: true, onclick: async () => { btn.disabled = true; btn.textContent = 'A eliminar…'; try { await API.eliminarCascata(spec.tab, it.id, true, inp.value); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); btn.disabled = false; btn.textContent = 'Eliminar tudo definitivamente'; return; } c.close(); if (ps) ps.close(); toast('Eliminado'); try { await reloadAll(); } catch (e) { } } }, 'Eliminar tudo definitivamente');
+  const btn = h('button', { class: 'btn bad', disabled: true, onclick: async () => { btn.disabled = true; btn.textContent = 'A eliminar…'; try { await API.eliminarCascata(spec.tab, it.id, true, inp.value); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); btn.disabled = false; btn.textContent = 'Eliminar tudo definitivamente'; return; } c.close(); if (ps) ps.close(); if (fecha2) fecha2(); toast('Eliminado'); try { await reloadAll(); } catch (e) { } } }, 'Eliminar tudo definitivamente');
   inp.oninput = () => { btn.disabled = inp.value.trim().toLowerCase() !== nm.trim().toLowerCase(); };
   const c = openSheet('Eliminar tudo em cascata', h('p', { style: 'margin-top:0' }, 'Vais apagar de vez «' + nm + '» e tudo o que depende dela:'), lista.length ? h('ul', { style: 'margin:8px 0 8px 18px' }, ...lista) : h('p', { class: 'mut' }, 'Não tem mais nada associado.'), h('p', { class: 'mut cap' }, 'Não se pode desfazer. Os professores não são apagados.'), h('label', { class: 'l' }, 'Escreve «' + nm + '» para confirmar'), inp, h('div', { style: 'height:10px' }), btn, h('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: () => c.close() }, 'Cancelar'));
 }
@@ -1955,7 +1955,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.21';
+const BUILD = 'v2.22';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
