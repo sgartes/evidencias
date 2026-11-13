@@ -341,7 +341,7 @@ const API = {
   async login(cred) { return gs('login', cred); },
   async pedirCodigo(email) { return gs('pedirCodigo', email); },
   async entrarCodigo(email, codigo) { return gs('entrarCodigo', email, codigo); },
-  async pedirAssinatura(localId, ids, nota, lembrete) { if (IS_GS) return gs('apiPedirAssinatura', localId, ids, nota, lembrete); return { ok: true, enviados: 1, aulas: ids.length, demo: true }; },
+  async pedirAssinatura(localId, ids, nota, lembrete, preview) { if (IS_GS) return gs('apiPedirAssinatura', localId, ids, nota, lembrete, preview); if (preview) return { ok: true, preview: true, para: ['funcionario@exemplo.pt'], responder: 'geral@sgartes.pt', assunto: 'Assinatura de aulas (exemplo)', corpo: 'Bom dia, (modo de demonstração: no modo real aparece aqui o texto do email, com a lista das aulas.)' }; return { ok: true, enviados: 1, aulas: ids.length, demo: true }; },
   async proporAluno(a) { if (IS_GS) return gs('apiProporAluno', a); return { ok: true, demo: true, alteracao: { id: 'AL-demo-' + Date.now(), tipo: DEMO.alunos.some(z => z.id === a.id) ? 'editar' : 'novo', aluno_id: a.id, estado: 'pendente', criado_em: new Date().toISOString(), nome: a.nome, local_id: a.local_id } }; },
   async decidirAlteracao(id, ok) { if (IS_GS) return gs('apiDecidirAlteracao', id, ok); return { ok: true, demo: true }; },
   async decidirFotos(aulaId, pub, nao) { if (IS_GS) return gs('apiDecidirFotos', aulaId, pub, nao); return { ok: true, demo: true, decididas: (pub || []).length + (nao || []).length, restantes: 0 }; },
@@ -680,13 +680,18 @@ function pedidoBox(lid, its) {
 }
 function pedidoModal(lid, ids, lembrete) {
   const nota = h('textarea', { class: 'in', placeholder: 'Nota opcional (ex.: obrigado pela colaboração)' });
+  const prev = h('div', { class: 'card', style: 'margin-top:12px' }, h('p', { class: 'mut cap', style: 'margin:0' }, 'A preparar o email…'));
+  let tmr = null;
+  const paint = async () => { try { const r = await API.pedirAssinatura(lid, ids, nota.value, lembrete, true); if (!r || r.preview !== true) throw new Error('sem pré-visualização'); prev.replaceChildren(h('b', {}, 'Assim vai o email'), h('p', { class: 'cap', style: 'margin:8px 0 2px' }, 'Para: ' + (r.para || []).join(', ')), h('p', { class: 'cap', style: 'margin:0 0 2px' }, 'Cópia oculta e respostas: ' + (r.responder || r.bcc || '—')), h('p', { class: 'cap', style: 'margin:0 0 8px' }, 'Assunto: ' + r.assunto), h('div', { style: 'white-space:pre-wrap;font-size:13px;line-height:1.45' }, r.corpo)); } catch (e) { prev.replaceChildren(h('p', { class: 'mut cap', style: 'margin:0' }, 'Não consegui mostrar o email agora. Podes enviar na mesma.')); } };
+  nota.addEventListener('input', () => { clearTimeout(tmr); tmr = setTimeout(paint, 600); });
   const s = openSheet(lembrete ? 'Relembrar a entidade' : 'Pedir assinatura à distância',
     h('p', { class: 'mut' }, `Vai ser enviado um email aos funcionários de ${(localById(lid) || {}).nome || 'este local'} com ${ids.length} aula(s) por assinar. Entram na app com um código recebido no email.`),
-    h('label', { class: 'l' }, 'Nota'), nota,
+    h('label', { class: 'l' }, 'Nota'), nota, prev,
     h('button', { class: 'btn primary', style: 'margin-top:14px', onclick: async e => { const b = e.currentTarget; b.disabled = true;
       try { const r = await API.pedirAssinatura(lid, ids, nota.value, lembrete); S.d.pedidos = (S.d.pedidos || []).filter(p => p.local_id !== lid).concat([{ local_id: lid, criado_em: new Date().toISOString(), tipo: lembrete ? 'lembrete' : 'pedido', n: r.aulas }]);
         s.close(); toast(r.demo ? 'No modo real, o email segue para o funcionário.' : `Email enviado a ${r.enviados} funcionário(s) ✓`); render(); }
       catch (err) { toast(err.server ? err.message : 'Sem ligação ao servidor.'); b.disabled = false; } } }, 'Enviar email'));
+  paint();
 }
 function sigModal() {
   let data = null; const pad = makePad(null, d => { data = d; });
