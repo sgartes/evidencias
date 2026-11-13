@@ -1240,6 +1240,8 @@ function stepFoto() {
       ...pend.map(a => h('div', { class: 'row', style: 'padding:6px 0;gap:8px;flex-wrap:wrap;align-items:center' }, h('div', { class: 'grow' }, a.nome),
         f.rgpdFora[a.id] ? h('span', { class: 'chip rgpd' }, 'Fica fora da foto') : [h('button', { class: 'btn ghost small', onclick: () => assinar(a) }, 'Assina agora'), h('button', { class: 'btn ghost small', onclick: () => marcaFora(a) }, 'Fica fora da foto')]))) : null;
     const avisoRecusa = recus.length ? h('p', { class: 'mut cap', style: 'margin:0 0 12px' }, 'Fora da foto (não aceitaram RGPD): ' + recus.map(a => a.nome).join(', ')) : null;
+    const prev = h('div', { style: 'margin:4px 0 12px' });
+    if (f.fotos.length) (async () => { try { const bn = await bannerFor(f.local, f.proj); if (!bn) return; const u = await composite(f.fotos[0].dataUrl, bn); prev.replaceChildren(h('p', { class: 'mut cap', style: 'margin:0 0 6px' }, 'Assim vai o post, com o banner do local:'), h('img', { src: u, alt: 'Post com banner', style: 'width:100%;border-radius:12px;display:block' })); } catch (e) { } })();
     box.replaceChildren(avisoRgpd, avisoRecusa,
       h('button', { class: 'btn shot', onclick: () => cam.click() }, h('span', { style: 'font-size:38px' }, '📷'), f.fotos.length ? 'Tirar outra foto' : 'Tirar foto de grupo'),
       h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => gal.click() }, 'Escolher da galeria')), cam, gal,
@@ -1248,6 +1250,7 @@ function stepFoto() {
         i === 0 ? h('span', { class: 'tag' }, 'Foto do post') : null,
         h('button', { class: 'x', 'aria-label': 'Remover', onclick: () => { f.fotos.splice(i, 1); paint(); } }, '✕')))) : null,
       f.fotos.length > 1 ? h('p', { class: 'mut cap' }, 'Toca numa foto para a usar no post do Instagram.') : null,
+      prev,
       h('label', { class: 'l' }, 'Observações (opcional)'),
       h('textarea', { class: 'in', placeholder: 'Ex.: dia festivo, mostra, aula ao ar livre…', value: f.obs, oninput: e => { f.obs = e.target.value; } }),
       h('div', { class: 'pills', style: 'margin-top:8px' }, ...['Dia festivo', 'Mostra', 'Aula ao ar livre'].map(t => h('button', { class: 'pill', onclick: e => { const ta = box.querySelector('textarea'); ta.value = (ta.value ? ta.value.trim() + '; ' : '') + t; f.obs = ta.value; } }, '+ ' + t))),
