@@ -1429,6 +1429,7 @@ function viewDone() {
   el.append(fc);
   // post
   const pc = h('div', { class: 'card' }, h('b', { style: 'font-size:16.5px' }, '2. Post no Instagram'));
+  if (rec.post_estado === 'na' && (projById(rec.projetoId) || {}).post_publico === 'sim') rec.post_estado = 'pendente';
   if (rec.post_estado === 'na') pc.append(h('p', { class: 'mut' }, 'Este projeto não publica nas redes. A evidência fica só na pasta do projeto.'));
   else if (rec.post_estado === 'nao_publicar') pc.append(h('p', { class: 'mut' }, 'Sem post: há alunos presentes sem consentimento RGPD assinado.'), h('button', { class: 'btn ghost', onclick: () => markEstado(rec, { post_estado: 'pendente' }) }, 'Afinal quero publicar'));
   else if (rec.post_estado === 'publicado') pc.append(h('div', { style: 'margin-top:8px' }, h('span', { class: 'chip ok' }, 'Post publicado ✓')));
@@ -1890,7 +1891,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.16';
+const BUILD = 'v2.17';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
