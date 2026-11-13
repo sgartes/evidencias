@@ -399,6 +399,10 @@ const API = {
     if (IS_GS) return gs('apiEliminarAluno', id, confirmar);
     return { ok: true, pode: true, bloqueios: [], abreviado: '' };
   },
+  async eliminarEntidade(tab, id, confirmar) {
+    if (IS_GS) return gs('apiEliminarEntidade', tab, id, confirmar);
+    return { ok: true, pode: true, bloqueios: [], nome: '' };
+  },
   async eliminarAula(id, motivo) {
     if (IS_GS) return gs('apiEliminarAula', id, motivo);
     const i = DEMO.aulas.findIndex(z => z.id === id); if (i >= 0) DEMO.aulas.splice(i, 1);
@@ -1555,9 +1559,9 @@ const GE = {
   }
 };
 async function reloadAll() { const r = await API.boot(); if (IS_GS) await kv.set('boot', r); applyBoot(r); render(); }
-function geForm(sec, it) {
+function geForm(sec, it, opt) {
   const spec = GE[sec], inputs = {}, err = h('p', { style: 'color:#c0392b;font-weight:700;margin:12px 0 0' });
-  const cur = it || {};
+  const cur = it || (opt && opt.preset) || {};
   const body = spec.fields().map(f => {
     let el;
     if (f.type === 'select') { el = h('select', { class: 'in' }, ...f.opts().map(([v, l]) => h('option', { value: v }, l))); el.value = String(cur[f.k] !== undefined && cur[f.k] !== '' ? cur[f.k] : (f.def !== undefined ? f.def : (f.opts()[0] || [''])[0])); }
@@ -1569,23 +1573,59 @@ function geForm(sec, it) {
   const save = h('button', { class: 'btn primary', style: 'margin-top:18px', onclick: async () => {
     const obj = it ? { id: it.id } : {}; spec.fields().forEach(f => { obj[f.k] = inputs[f.k].value; });
     save.disabled = true; save.textContent = 'A guardar…'; err.textContent = '';
-    try { await API.adminSave(spec.tab, obj); s.close(); toast('Guardado ✓'); await reloadAll(); }
+    try { const rr = await API.adminSave(spec.tab, obj); s.close(); toast('Guardado ✓'); await reloadAll(); if (opt && opt.onDone) opt.onDone(rr && rr.id ? rr.id : (it && it.id), obj); }
     catch (e) { err.textContent = e.server ? e.message : 'Sem ligação ao servidor. Tenta outra vez.'; save.disabled = false; save.textContent = 'Guardar'; }
   } }, 'Guardar');
-  const s = openSheet(it ? 'Editar' : spec.novo, ...body, err, save);
+  const del = it ? h('button', { class: 'btn bad', style: 'margin-top:10px', onclick: () => eliminarEntModal(sec, it, s) }, 'Eliminar…') : null;
+  const s = openSheet(it ? 'Editar' : spec.novo, ...body, err, save, del);
 }
+/* ---------- ELIMINAR ENTIDADE + ASSISTENTE DE PROJETO ---------- */
+async function eliminarEntModal(sec, it, ps) {
+  const spec = GE[sec]; let r;
+  try { r = await API.eliminarEntidade(spec.tab, it.id, false); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); return; }
+  const nm = spec.nome(it);
+  if (!r.pode) { openSheet('Eliminar', h('p', { class: 'mut', style: 'margin-top:0' }, 'Ainda não dá para eliminar «' + nm + '». Tem associado: ' + (r.bloqueios || []).join(', ') + '.'), h('p', { class: 'mut cap' }, 'Elimina ou muda primeiro o que está associado (aulas em Registos, alunos em Alunos). Se for só para retirar, marca como inativo.')); return; }
+  const c = openSheet('Eliminar', h('p', { class: 'mut', style: 'margin-top:0' }, 'Vais eliminar «' + nm + '» de vez. Não se pode desfazer.'),
+    h('button', { class: 'btn bad', onclick: async () => { try { await API.eliminarEntidade(spec.tab, it.id, true); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); return; } c.close(); if (ps) ps.close(); toast('Eliminado'); try { await reloadAll(); } catch (e) { } } }, 'Eliminar definitivamente'),
+    h('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: () => c.close() }, 'Cancelar'));
+}
+function wizardProjeto() { S.wiz = S.wiz || {}; wizHub(S.wiz); }
+function wizHub(ctx) {
+  if (ctx.sh) { try { ctx.sh.close(); } catch (e) { } ctx.sh = null; }
+  const proj = ctx.proj && projById(ctx.proj), prof = ctx.prof && profById(ctx.prof);
+  const locs = proj ? S.d.locais.filter(l => l.projeto_id === proj.id) : [];
+  const grs = S.d.grupos.filter(g => locs.some(l => l.id === g.local_id));
+  const again = () => wizHub(ctx);
+  const open = (sec, it, opt) => { ctx.sh.close(); ctx.sh = null; geForm(sec, it, opt); };
+  const line = (ok, titulo, det, btns) => h('div', { class: 'card', style: 'margin:8px 0' }, h('div', { class: 'row', style: 'gap:8px;align-items:center;flex-wrap:wrap' }, h('b', { class: 'grow' }, (ok ? '✓ ' : '○ ') + titulo), ...btns), det ? h('div', { class: 'mut cap', style: 'margin-top:4px' }, det) : null);
+  const sel = h('select', { class: 'in' }, h('option', { value: '' }, '— escolher projeto existente —'), ...S.d.projetos.map(p => h('option', { value: p.id }, p.nome)));
+  const body = [
+    h('p', { class: 'mut cap', style: 'margin-top:0' }, 'Percorre os passos pela ordem. Podes sair a qualquer momento e voltar depois: o que já criaste fica guardado.'),
+    line(!!prof, '1. Professor', prof ? prof.nome : 'Se já existe, salta este passo e escolhe-o na turma.', [h('button', { class: 'btn small ghost', onclick: () => open('professores', null, { onDone: id => { ctx.prof = id; again(); } }) }, prof ? 'Outro professor' : 'Criar professor')]),
+    line(!!proj, '2. Projeto', proj ? proj.nome : null, proj ? [h('button', { class: 'btn small ghost', onclick: () => open('projetos', proj, { onDone: again }) }, 'Editar')] : [h('button', { class: 'btn small ghost', onclick: () => open('projetos', null, { onDone: id => { ctx.proj = id; again(); } }) }, 'Criar projeto')]),
+    !proj ? h('div', { style: 'margin:0 0 8px' }, sel, h('button', { class: 'btn small ghost', style: 'margin-top:6px', onclick: () => { if (sel.value) { ctx.proj = sel.value; again(); } } }, 'Continuar este projeto')) : null,
+    line(locs.length > 0, '3. Locais', locs.map(l => l.nome).join(' · ') || null, [h('button', { class: 'btn small ghost', disabled: proj ? null : true, onclick: () => open('locais', null, { preset: { projeto_id: proj.id }, onDone: id => { ctx.local = id; again(); } }) }, '+ Local')]),
+    line(grs.length > 0, '4. Turmas', grs.map(g => g.nome).join(' · ') || null, [h('button', { class: 'btn small ghost', disabled: locs.length ? null : true, onclick: () => open('grupos', null, { preset: { local_id: ctx.local && locs.some(l => l.id === ctx.local) ? ctx.local : locs[0].id, professor_id: ctx.prof || '' }, onDone: id => { ctx.grupo = id; again(); } }) }, '+ Turma')]),
+    line(false, '5. Alunos', 'Podes adicioná-los agora ou mais tarde.', [h('button', { class: 'btn small ghost', disabled: grs.length ? null : true, onclick: () => { const g = grs.find(x => x.id === ctx.grupo) || grs[0]; ctx.sh.close(); ctx.sh = null; alunoModal(null, { localId: g.local_id, grupoId: g.id, fixed: true, onSave: async a => { await saveAlunoEdit(a); again(); } }); } }, '+ Aluno')]),
+    h('p', { class: 'mut cap' }, 'O banner do projeto é enviado à parte (diz-me o ficheiro e o projeto).'),
+    h('button', { class: 'btn primary', style: 'margin-top:8px', onclick: () => { ctx.sh.close(); ctx.sh = null; } }, 'Continuar mais tarde'),
+    proj ? h('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: () => { S.wiz = null; ctx.sh.close(); ctx.sh = null; toast('Assistente concluído'); } }, 'Concluir e começar outro') : null];
+  ctx.sh = openSheet('Criar projeto passo a passo', ...body);
+}
+
 function viewGestao() {
-  const st = S.ge = S.ge || { sec: 'locais' }, spec = GE[st.sec];
+  const st = S.ge = S.ge || { sec: 'projetos' }, spec = GE[st.sec];
   const el = h('div');
   el.append(h('h1', {}, 'Gestão'),
-    h('div', { class: 'seg', style: 'flex-wrap:wrap;margin-bottom:14px' }, ...Object.keys(GE).map(k => h('button', { class: st.sec === k ? 'on' : '', style: 'min-width:46%;min-height:46px', onclick: () => { st.sec = k; render(); } }, GE[k].titulo))),
+    h('div', { class: 'seg', style: 'flex-wrap:wrap;margin-bottom:14px' }, ...['professores', 'projetos', 'locais', 'grupos'].map(k => h('button', { class: st.sec === k ? 'on' : '', style: 'min-width:46%;min-height:46px', onclick: () => { st.sec = k; render(); } }, GE[k].titulo))),
+    h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => wizardProjeto() }, '✦ Criar projeto passo a passo'),
     h('button', { class: 'btn primary', style: 'margin-bottom:14px', onclick: () => geForm(st.sec, null) }, '+ ' + spec.novo));
   const items = spec.items();
   if (!items.length) el.append(h('p', { class: 'mut' }, 'Ainda não há nada aqui.'));
   items.forEach(it => el.append(h('div', { class: 'card row', style: spec.inactive && spec.inactive(it) ? 'opacity:.6' : '' },
     h('div', { class: 'grow' }, h('b', {}, spec.nome(it)), h('div', { class: 'mut cap' }, spec.sub(it))),
     h('button', { class: 'btn small ghost', onclick: () => geForm(st.sec, it) }, 'Editar'))));
-  el.append(h('p', { class: 'mut cap', style: 'margin-top:16px' }, 'Nada é apagado: para retirar uma turma ou um professor, marca-o como inativo.'));
+  el.append(h('p', { class: 'mut cap', style: 'margin-top:16px' }, 'Para retirar uma turma ou um professor, marca-o como inativo. Só se pode eliminar o que não tem nada associado (Editar → Eliminar).'));
   return el;
 }
 
@@ -1867,7 +1907,7 @@ async function eliminarAlunoModal(a, ps) {
   let r; try { r = await API.eliminarAluno(a.id, false); } catch (e) { toast(e.server ? e.message : 'Sem liga\u00e7\u00e3o.'); return; }
   if (!r.pode) { openSheet('Eliminar dados pessoais', h('p', { class: 'mut', style: 'margin-top:0' }, 'Ainda n\u00e3o \u00e9 poss\u00edvel. ' + a.nome + ' frequentou projetos que n\u00e3o est\u00e3o encerrados:'), h('p', {}, (r.bloqueios || []).join(', ')), h('p', { class: 'mut cap' }, 'Depois de a entidade aprovar o relat\u00f3rio, marca o projeto como Encerrado em Gest\u00e3o \u2192 Projetos.')); return; }
   const c = openSheet('Eliminar dados pessoais', h('p', { class: 'mut', style: 'margin-top:0' }, 'Vais apagar de vez o contacto, a data de nascimento, a fotografia e a assinatura RGPD de ' + a.nome + '. Nas presen\u00e7as fica s\u00f3 o nome abreviado (' + (r.abreviado || '') + ') para os totais baterem. O aluno fica inativo. N\u00e3o se pode desfazer.'),
-    h('button', { class: 'btn bad', onclick: async () => { try { await API.eliminarAluno(a.id, true); } catch (e) { toast(e.server ? e.message : 'Sem liga\u00e7\u00e3o.'); return; } c.close(); if (ps) ps.close(); toast('Dados eliminados'); try { await refreshData(); } catch (e) { } render(); } }, 'Eliminar definitivamente'));
+    h('button', { class: 'btn bad', onclick: async () => { try { await API.eliminarAluno(a.id, true); } catch (e) { toast(e.server ? e.message : 'Sem liga\u00e7\u00e3o.'); return; } c.close(); if (ps) ps.close(); toast('Dados eliminados'); try { await reloadAll(); } catch (e) { } } }, 'Eliminar definitivamente'));
 }
 function marcaAgua() {
   const quem = String((S.me && S.me.nome) || '').replace(/[&<>'"]/g, ''), txt = 'Só para visualização · ' + quem + ' · ' + fmtShort(today());
@@ -1900,7 +1940,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.18';
+const BUILD = 'v2.19';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
