@@ -409,6 +409,10 @@ const API = {
     if (IS_GS) return gs('apiEliminarCascata', tab, id, confirmar, texto);
     return { ok: true, nome: '', resumo: {} };
   },
+  async painelProjetos() {
+    if (IS_GS) return gs('apiPainelProjetos');
+    return { ok: true, projetos: [] };
+  },
   async arquivoProjeto(projId, desde, parte, tag) {
     if (IS_GS) return gs('apiArquivoProjeto', projId, desde, parte, tag);
     return { ok: true, demo: true, parte: parte, proximo: 0, fim: true, total: 0, pastaUrl: '', ficheiro: '', falhas: [] };
@@ -1616,6 +1620,28 @@ async function eliminarCascataModal(sec, it, ps, fecha2) {
   const c = openSheet('Eliminar tudo em cascata', h('p', { style: 'margin-top:0' }, 'Vais apagar de vez «' + nm + '» e tudo o que depende dela:'), lista.length ? h('ul', { style: 'margin:8px 0 8px 18px' }, ...lista) : h('p', { class: 'mut' }, 'Não tem mais nada associado.'), h('p', { class: 'mut cap' }, 'Não se pode desfazer. Os professores não são apagados.'), h('label', { class: 'l' }, 'Escreve «' + nm + '» para confirmar'), inp, h('div', { style: 'height:10px' }), btn, h('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: () => c.close() }, 'Cancelar'));
 }
 /* N8: arquivo completo do projeto (ZIP no Drive), gerado por partes pelo servidor */
+function painelProjetosModal() {
+  const lista = h('div', {}, h('p', { class: 'mut' }, 'A carregar…'));
+  const s = openSheet('Painel por projeto', lista);
+  const EST = { ativo: 'Ativo', relatorio_entregue: 'Relatório entregue', encerrado: 'Encerrado' };
+  const dm = d => d ? String(d).split('-').reverse().join('/') : '—';
+  API.painelProjetos().then(r => {
+    lista.textContent = '';
+    const ps = (r && r.projetos) || [];
+    if (!ps.length) { lista.append(h('p', { class: 'mut' }, 'Ainda não há projetos.')); return; }
+    ps.forEach(p => {
+      const cel = (n, txt, alerta) => h('div', { style: 'flex:1 1 30%;min-width:90px;text-align:center;padding:6px 2px;border-radius:10px;background:' + (alerta ? '#fff1e0' : '#f6f1ec') },
+        h('div', { style: 'font-weight:800;font-size:20px' }, String(n)), h('div', { class: 'mut', style: 'font-size:12px' }, txt));
+      lista.append(h('div', { class: 'card', style: 'margin-bottom:10px' },
+        h('div', { style: 'display:flex;justify-content:space-between;gap:8px;align-items:baseline' }, h('b', {}, p.nome || p.id), h('span', { class: 'mut', style: 'font-size:13px' }, EST[p.estado] || p.estado)),
+        h('p', { class: 'mut', style: 'margin:4px 0 8px;font-size:13px' }, p.locais + ' local(is) · última aula: ' + dm(p.ultima)),
+        h('div', { style: 'display:flex;flex-wrap:wrap;gap:6px' },
+          cel(p.aulas, 'aulas'), cel(p.aulas30, 'aulas (30 dias)'), cel(p.presencas, 'presenças'), cel(p.alunos, 'alunos'),
+          cel(p.porAssinar, 'por assinar', p.porAssinar > 0), cel(p.aprovPend, 'por aprovar', p.aprovPend > 0), cel(p.fotosPend, 'fotos por aprovar', p.fotosPend > 0), cel(p.postsPend, 'posts pendentes', p.postsPend > 0)),
+        (p.estado === 'relatorio_entregue' || p.estado === 'encerrado') ? h('button', { class: 'btn small ghost', style: 'margin-top:8px', onclick: () => { s.close(); arquivoProjetoModal(p.id); } }, 'Arquivo completo (ZIP)…') : null));
+    });
+  }).catch(e => { lista.textContent = 'Não foi possível carregar: ' + (e && e.message || e); });
+}
 function arquivoProjetoModal(projId) {
   const p = projById(projId); if (!p) return;
   const st = h('p', { class: 'mut', style: 'margin:8px 0' }, 'Guarda no Drive (pasta Arquivo) um ZIP com as aulas, presenças, assinaturas, consentimentos RGPD, fotos e os PDFs das folhas de presença deste projeto. Contém dados pessoais: guarda-o em local seguro.');
@@ -1670,6 +1696,7 @@ function viewGestao() {
   el.append(h('h1', {}, 'Gestão'),
     h('div', { class: 'seg', style: 'flex-wrap:wrap;margin-bottom:14px' }, ...['professores', 'projetos', 'locais', 'grupos'].map(k => h('button', { class: st.sec === k ? 'on' : '', style: 'min-width:46%;min-height:46px', onclick: () => { st.sec = k; render(); } }, GE[k].titulo))),
     h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => wizardProjeto() }, '✦ Criar projeto passo a passo'),
+    st.sec === 'projetos' ? h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => painelProjetosModal() }, '📊 Painel por projeto') : null,
     h('button', { class: 'btn primary', style: 'margin-bottom:14px', onclick: () => geForm(st.sec, null) }, '+ ' + spec.novo));
   const items = spec.items();
   if (!items.length) el.append(h('p', { class: 'mut' }, 'Ainda não há nada aqui.'));
@@ -1991,7 +2018,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.24';
+const BUILD = 'v2.25';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
