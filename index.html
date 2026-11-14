@@ -1625,19 +1625,49 @@ function painelProjetosModal() {
   const s = openSheet('Painel por projeto', lista);
   const EST = { ativo: 'Ativo', relatorio_entregue: 'Relatório entregue', encerrado: 'Encerrado' };
   const dm = d => d ? String(d).split('-').reverse().join('/') : '—';
+  const dias = (x, y) => Math.round((parseD(y) - parseD(x)) / 864e5);
   API.painelProjetos().then(r => {
     lista.textContent = '';
-    const ps = (r && r.projetos) || [];
+    const ps = (r && r.projetos) || [], hoje = r.hoje || today();
     if (!ps.length) { lista.append(h('p', { class: 'mut' }, 'Ainda não há projetos.')); return; }
-    ps.forEach(p => {
-      const cel = (n, txt, alerta) => h('div', { style: 'flex:1 1 30%;min-width:90px;text-align:center;padding:6px 2px;border-radius:10px;background:' + (alerta ? '#fff1e0' : '#f6f1ec') },
-        h('div', { style: 'font-weight:800;font-size:20px' }, String(n)), h('div', { class: 'mut', style: 'font-size:12px' }, txt));
+    const avisos = p => {
+      const o = [];
+      if (p.estado === 'ativo') {
+        if (p.fim) { const f = dias(hoje, p.fim); if (f < 0) o.push('Prazo terminado há ' + (-f) + ' dia(s): falta entregar o relatório'); else if (f <= 30) o.push('Termina em ' + f + ' dia(s)'); }
+        if (p.inicio && p.inicio <= hoje) { if (!p.aulas) o.push('Ainda sem aulas registadas'); else if (dias(p.ultima, hoje) > 21) o.push('Sem aulas há ' + dias(p.ultima, hoje) + ' dias'); }
+      }
+      return o;
+    };
+    const ir = alvo => { s.close(); S.pend = alvo; go('tab', 'pend'); };
+    const cel = (n, txt, alerta, alvo) => {
+      const st = 'flex:1 1 30%;min-width:90px;text-align:center;padding:6px 2px;border-radius:10px;border:0;color:inherit;background:' + (alerta ? '#fff1e0' : '#f6f1ec');
+      const inner = [h('div', { style: 'font-weight:800;font-size:20px' }, String(n)), h('div', { class: 'mut', style: 'font-size:12px' }, txt + (alvo && n > 0 ? ' ›' : ''))];
+      return (alvo && n > 0) ? h('button', { style: st + ';min-height:44px', 'aria-label': n + ' ' + txt + ': ver em Pendentes', onclick: () => ir(alvo) }, ...inner) : h('div', { style: st }, ...inner);
+    };
+    const meses = p => {
+      const ms = (p.meses || []).slice(-12); if (!ms.length) return null;
+      const mx = Math.max(1, ...ms.map(m => m.presencas));
+      return h('div', { style: 'margin-top:10px' }, h('div', { class: 'mut', style: 'font-size:12px;margin-bottom:4px' }, 'Por mês (aulas · presenças)'),
+        ...ms.map(m => h('div', { style: 'display:flex;align-items:center;gap:8px;font-size:12px;margin:2px 0' }, h('span', { style: 'width:46px' }, m.ym.slice(5) + '/' + m.ym.slice(2, 4)),
+          h('div', { style: 'flex:1;background:#f0e7de;border-radius:6px;height:14px' }, h('div', { style: 'width:' + Math.max(2, Math.round(100 * m.presencas / mx)) + '%;height:14px;border-radius:6px;background:var(--brand)' })),
+          h('span', { style: 'width:72px;text-align:right' }, m.aulas + ' · ' + m.presencas))));
+    };
+    const detalhe = p => (p.locs || []).length ? h('details', { style: 'margin-top:8px' }, h('summary', { style: 'min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:700' }, 'Locais e turmas (' + p.locs.length + ')'),
+      ...p.locs.map(lo => h('div', { style: 'margin:6px 0 10px' }, h('div', { style: 'display:flex;justify-content:space-between;gap:8px' }, h('b', {}, lo.nome), h('span', { class: 'mut', style: 'font-size:12px;text-align:right' }, lo.aulas + ' aulas · ' + lo.presencas + ' presenças · ' + lo.alunos + ' alunos')),
+        ...lo.turmas.map(g => h('div', { class: 'mut', style: 'font-size:13px;margin:2px 0 0 12px;display:flex;justify-content:space-between;gap:8px' }, h('span', {}, g.nome), h('span', { style: 'text-align:right' }, g.aulas + ' aulas · ' + g.presencas + ' presenças · ' + g.alunos + ' alunos')))))) : null;
+    const ordem = p => (p.estado === 'ativo' ? (avisos(p).length ? 0 : 1) : 2);
+    const nAv = ps.filter(p => avisos(p).length).length;
+    if (nAv) lista.append(h('p', { style: 'margin:0 0 10px;font-weight:700' }, nAv + (nAv === 1 ? ' projeto precisa' : ' projetos precisam') + ' de atenção'));
+    ps.slice().sort((x, y) => ordem(x) - ordem(y)).forEach(p => {
+      const av = avisos(p);
       lista.append(h('div', { class: 'card', style: 'margin-bottom:10px' },
         h('div', { style: 'display:flex;justify-content:space-between;gap:8px;align-items:baseline' }, h('b', {}, p.nome || p.id), h('span', { class: 'mut', style: 'font-size:13px' }, EST[p.estado] || p.estado)),
-        h('p', { class: 'mut', style: 'margin:4px 0 8px;font-size:13px' }, p.locais + ' local(is) · última aula: ' + dm(p.ultima)),
+        h('p', { class: 'mut', style: 'margin:4px 0 8px;font-size:13px' }, dm(p.inicio) + ' a ' + dm(p.fim) + ' · ' + p.locais + ' local(is) · última aula: ' + dm(p.ultima)),
+        ...av.map(x => h('div', { style: 'background:#fff1e0;color:#8a4b00;border-radius:10px;padding:6px 10px;font-size:13px;font-weight:600;margin-bottom:6px' }, x)),
         h('div', { style: 'display:flex;flex-wrap:wrap;gap:6px' },
           cel(p.aulas, 'aulas'), cel(p.aulas30, 'aulas (30 dias)'), cel(p.presencas, 'presenças'), cel(p.alunos, 'alunos'),
-          cel(p.porAssinar, 'por assinar', p.porAssinar > 0), cel(p.aprovPend, 'por aprovar', p.aprovPend > 0), cel(p.fotosPend, 'fotos por aprovar', p.fotosPend > 0), cel(p.postsPend, 'posts pendentes', p.postsPend > 0)),
+          cel(p.porAssinar, 'por assinar', p.porAssinar > 0, 'assin'), cel(p.aprovPend, 'por aprovar', p.aprovPend > 0, 'aprov'), cel(p.fotosPend, 'fotos por aprovar', p.fotosPend > 0, 'fotos'), cel(p.postsPend, 'posts pendentes', p.postsPend > 0)),
+        meses(p), detalhe(p),
         (p.estado === 'relatorio_entregue' || p.estado === 'encerrado') ? h('button', { class: 'btn small ghost', style: 'margin-top:8px', onclick: () => { s.close(); arquivoProjetoModal(p.id); } }, 'Arquivo completo (ZIP)…') : null));
     });
   }).catch(e => { lista.textContent = 'Não foi possível carregar: ' + (e && e.message || e); });
@@ -2018,7 +2048,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.25';
+const BUILD = 'v2.26';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
