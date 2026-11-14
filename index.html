@@ -1567,6 +1567,7 @@ const GE = {
     fields: () => [
       { k: 'nome', l: 'Nome do projeto' }, { k: 'programa', l: 'Programa' }, { k: 'entidade', l: 'Entidade financiadora' },
       { k: 'data_inicio', l: 'Início do período', type: 'date' }, { k: 'data_fim', l: 'Fim do período', type: 'date', help: 'Aulas fora destas datas ficam a aguardar a tua aprovação.' },
+      { k: 'horas_previstas', l: 'Total de horas previstas do projeto', help: 'Ex.: 120. Serve para calcular as horas em falta no painel por projeto. Vazio = sem total.' },
       { k: 'estado', l: 'Estado do projeto', type: 'select', opts: ESTADOS_PROJ, def: 'ativo', help: 'Só se podem eliminar dados pessoais de alunos quando todos os projetos que frequentaram estão Encerrados.' },
       { k: 'formulario_url', l: 'Link do formulário (https://…)', type: 'url' },
       { k: 'entidade_email', l: 'Email da entidade', type: 'email', help: 'Recebe um aviso quando um professor regista uma aula não prevista. Vazio = não envia nada.' },
@@ -1636,7 +1637,22 @@ function painelProjetosModal() {
         if (p.fim) { const f = dias(hoje, p.fim); if (f < 0) o.push('Prazo terminado há ' + (-f) + ' dia(s): falta entregar o relatório'); else if (f <= 30) o.push('Termina em ' + f + ' dia(s)'); }
         if (p.inicio && p.inicio <= hoje) { if (!p.aulas) o.push('Ainda sem aulas registadas'); else if (dias(p.ultima, hoje) > 21) o.push('Sem aulas há ' + dias(p.ultima, hoje) + ' dias'); }
       }
+      if (p.estado === 'ativo' && p.fim && p.minFalta > 0 && p.minHorario < p.minFalta) o.push('Pelo horário só se dão ' + hh(p.minHorario) + ' até ao fim; faltam ' + hh(p.minFalta - p.minHorario) + ' para as horas previstas');
       return o;
+    };
+    const hh = m => { const H = Math.floor((m || 0) / 60), R = Math.round((m || 0) % 60); return R ? H + 'h' + ('0' + R).slice(-2) : H + 'h'; };
+    const horas = p => {
+      const dadas = p.min || 0, prev = p.minPrev || 0, falta = p.minFalta || 0;
+      const box = (valor, txt, alerta) => h('div', { style: 'flex:1 1 30%;min-width:90px;text-align:center;padding:8px 2px;border-radius:10px;background:' + (alerta ? '#fff1e0' : '#f6f1ec') }, h('div', { style: 'font-weight:800;font-size:22px' }, valor), h('div', { class: 'mut', style: 'font-size:12px' }, txt));
+      const cels = [box(hh(dadas), 'horas dadas')];
+      const aperto = p.estado === 'ativo' && p.fim && falta > 0 && p.minHorario < falta;
+      if (prev > 0) { cels.push(box(hh(prev), 'horas previstas')); cels.push(box(hh(falta), 'horas em falta', aperto)); }
+      const nota = [];
+      if (prev > 0) nota.push('Concluído: ' + Math.min(100, Math.round(100 * dadas / prev)) + '%'); else nota.push('Define o total de horas previstas na ficha do projeto para ver as horas em falta.');
+      if (p.estado === 'ativo' && p.minHorario) nota.push('Pelo horário das turmas ainda se dão cerca de ' + hh(p.minHorario) + ' até ao fim do período (estimativa, sem contar feriados)');
+      return h('div', { style: 'margin:8px 0' }, h('div', { style: 'display:flex;flex-wrap:wrap;gap:6px' }, ...cels),
+        prev > 0 ? h('div', { style: 'background:#f0e7de;border-radius:6px;height:10px;margin-top:6px' }, h('div', { style: 'width:' + Math.min(100, Math.round(100 * dadas / prev)) + '%;height:10px;border-radius:6px;background:var(--brand)' })) : null,
+        h('div', { class: 'mut', style: 'font-size:12px;margin-top:4px' }, nota.join(' · ')));
     };
     const ir = alvo => { s.close(); S.pend = alvo; go('tab', 'pend'); };
     const cel = (n, txt, alerta, alvo) => {
@@ -1653,8 +1669,8 @@ function painelProjetosModal() {
           h('span', { style: 'width:72px;text-align:right' }, m.aulas + ' · ' + m.presencas))));
     };
     const detalhe = p => (p.locs || []).length ? h('details', { style: 'margin-top:8px' }, h('summary', { style: 'min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:700' }, 'Locais e turmas (' + p.locs.length + ')'),
-      ...p.locs.map(lo => h('div', { style: 'margin:6px 0 10px' }, h('div', { style: 'display:flex;justify-content:space-between;gap:8px' }, h('b', {}, lo.nome), h('span', { class: 'mut', style: 'font-size:12px;text-align:right' }, lo.aulas + ' aulas · ' + lo.presencas + ' presenças · ' + lo.alunos + ' alunos')),
-        ...lo.turmas.map(g => h('div', { class: 'mut', style: 'font-size:13px;margin:2px 0 0 12px;display:flex;justify-content:space-between;gap:8px' }, h('span', {}, g.nome), h('span', { style: 'text-align:right' }, g.aulas + ' aulas · ' + g.presencas + ' presenças · ' + g.alunos + ' alunos')))))) : null;
+      ...p.locs.map(lo => h('div', { style: 'margin:6px 0 10px' }, h('div', { style: 'display:flex;justify-content:space-between;gap:8px' }, h('b', {}, lo.nome), h('span', { class: 'mut', style: 'font-size:12px;text-align:right' }, lo.aulas + ' aulas · ' + hh(lo.min) + ' · ' + lo.presencas + ' presenças · ' + lo.alunos + ' alunos')),
+        ...lo.turmas.map(g => h('div', { class: 'mut', style: 'font-size:13px;margin:2px 0 0 12px;display:flex;justify-content:space-between;gap:8px' }, h('span', {}, g.nome), h('span', { style: 'text-align:right' }, g.aulas + ' aulas · ' + hh(g.min) + ' · ' + g.presencas + ' presenças · ' + g.alunos + ' alunos')))))) : null;
     const ordem = p => (p.estado === 'ativo' ? (avisos(p).length ? 0 : 1) : 2);
     const nAv = ps.filter(p => avisos(p).length).length;
     if (nAv) lista.append(h('p', { style: 'margin:0 0 10px;font-weight:700' }, nAv + (nAv === 1 ? ' projeto precisa' : ' projetos precisam') + ' de atenção'));
@@ -1664,6 +1680,7 @@ function painelProjetosModal() {
         h('div', { style: 'display:flex;justify-content:space-between;gap:8px;align-items:baseline' }, h('b', {}, p.nome || p.id), h('span', { class: 'mut', style: 'font-size:13px' }, EST[p.estado] || p.estado)),
         h('p', { class: 'mut', style: 'margin:4px 0 8px;font-size:13px' }, dm(p.inicio) + ' a ' + dm(p.fim) + ' · ' + p.locais + ' local(is) · última aula: ' + dm(p.ultima)),
         ...av.map(x => h('div', { style: 'background:#fff1e0;color:#8a4b00;border-radius:10px;padding:6px 10px;font-size:13px;font-weight:600;margin-bottom:6px' }, x)),
+        horas(p),
         h('div', { style: 'display:flex;flex-wrap:wrap;gap:6px' },
           cel(p.aulas, 'aulas'), cel(p.aulas30, 'aulas (30 dias)'), cel(p.presencas, 'presenças'), cel(p.alunos, 'alunos'),
           cel(p.porAssinar, 'por assinar', p.porAssinar > 0, 'assin'), cel(p.aprovPend, 'por aprovar', p.aprovPend > 0, 'aprov'), cel(p.fotosPend, 'fotos por aprovar', p.fotosPend > 0, 'fotos'), cel(p.postsPend, 'posts pendentes', p.postsPend > 0)),
@@ -2048,7 +2065,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.26';
+const BUILD = 'v2.27';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
