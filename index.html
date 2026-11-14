@@ -413,6 +413,14 @@ const API = {
     if (IS_GS) return gs('apiPainelProjetos');
     return { ok: true, projetos: [] };
   },
+  async calendarioHoras(projId) { if (IS_GS) return gs('apiCalendarioHoras', projId); return { ok: true, hoje: today(), projetos: [], calendario: [] }; },
+  async calendarioSave(lista) { if (IS_GS) return gs('apiCalendarioSave', lista); return { ok: true }; },
+  async calendarioDel(id) { if (IS_GS) return gs('apiCalendarioDel', id); return { ok: true }; },
+  async coordSave(o) { if (IS_GS) return gs('apiCoordSave', o); return { ok: true }; },
+  async coordDel(id) { if (IS_GS) return gs('apiCoordDel', id); return { ok: true }; },
+  async importarAulas(rows, sim) { if (IS_GS) return gs('apiImportarAulas', rows, sim); return { ok: true, relatorio: [] }; },
+  async importarAlunos(l, sim) { if (IS_GS) return gs('apiImportarAlunos', l, sim); return { ok: true, relatorio: [] }; },
+  async importarPresencas(l, sim) { if (IS_GS) return gs('apiImportarPresencas', l, sim); return { ok: true, relatorio: [] }; },
   async arquivoProjeto(projId, desde, parte, tag) {
     if (IS_GS) return gs('apiArquivoProjeto', projId, desde, parte, tag);
     return { ok: true, demo: true, parte: parte, proximo: 0, fim: true, total: 0, pastaUrl: '', ficheiro: '', falhas: [] };
@@ -1320,6 +1328,7 @@ function stepFoto() {
         h('button', { class: 'x', 'aria-label': 'Remover', onclick: () => { f.fotos.splice(i, 1); paint(); } }, '✕')))) : null,
       f.fotos.length > 1 ? h('p', { class: 'mut cap' }, 'Toca numa foto para a usar no post do Instagram.') : null,
       prev,
+      h('label', { class: 'l' }, 'Tipo de sessão'), selTipo(f.tipo, v => { f.tipo = v; }),
       h('label', { class: 'l' }, 'Observações (opcional)'),
       h('textarea', { class: 'in', placeholder: 'Ex.: dia festivo, mostra, aula ao ar livre…', value: f.obs, oninput: e => { f.obs = e.target.value; } }),
       h('div', { class: 'pills', style: 'margin-top:8px' }, ...['Dia festivo', 'Mostra', 'Aula ao ar livre'].map(t => h('button', { class: 'pill', onclick: e => { const ta = box.querySelector('textarea'); ta.value = (ta.value ? ta.value.trim() + '; ' : '') + t; f.obs = ta.value; } }, '+ ' + t))),
@@ -1415,7 +1424,7 @@ async function finish() {
     idCliente: idc, grupoId: f.g.id, localId: f.local.id, data: f.data, inicio: f.inicio, fim: fromMin(toMin(f.inicio) + f.dur), duracaoMin: f.dur,
     profDeuId: S.me.id, profPrevistoId: f.g.professor_id, substituicao: f.subst ? 'sim' : 'nao', homens: c.h, mulheres: c.m,
     presencas: f.lista ? f.order.map(id => ({ alunoId: id, presente: f.marks[id] === true })) : [], novosAlunos: f.novos, listaGrupo: f.lista ? 'sim' : 'nao',
-    observacoes: f.obs.trim(), fotos: f.fotos.map(p => p.dataUrl), assinaturaResp: f.later ? null : f.assinR, nomeResp: f.later ? '' : f.resp.trim(), assinaturaProf: (needP || f.modoP === 'nova') ? f.assinP : null, gps: f.gps, semPost
+    observacoes: f.obs.trim(), fotos: f.fotos.map(p => p.dataUrl), assinaturaResp: f.later ? null : f.assinR, nomeResp: f.later ? '' : f.resp.trim(), assinaturaProf: (needP || f.modoP === 'nova') ? f.assinP : null, gps: f.gps, tipoSessao: f.tipo || 'aula', semPost
   };
   // atualiza já o que a app sabe localmente
   f.novos.forEach(n => { if (!S.d.alunos.some(a => a.id === n.id)) S.d.alunos.push(n); });
@@ -1566,8 +1575,9 @@ const GE = {
     items: () => S.d.projetos, nome: p => p.nome, sub: p => [p.entidade, p.data_inicio && p.data_fim ? `${p.data_inicio} → ${p.data_fim}` : 'sem datas'].filter(Boolean).join(' · '),
     fields: () => [
       { k: 'nome', l: 'Nome do projeto' }, { k: 'programa', l: 'Programa' }, { k: 'entidade', l: 'Entidade financiadora' },
-      { k: 'data_inicio', l: 'Início do período', type: 'date' }, { k: 'data_fim', l: 'Fim do período', type: 'date', help: 'Aulas fora destas datas ficam a aguardar a tua aprovação.' },
-      { k: 'horas_previstas', l: 'Total de horas previstas do projeto', help: 'Ex.: 120. Serve para calcular as horas em falta no painel por projeto. Vazio = sem total.' },
+      { k: 'data_inicio', l: 'Início das aulas', type: 'date' }, { k: 'data_fim', l: 'Data limite de execução', type: 'date', help: 'Data limite do contrato. Aulas fora destas datas ficam a aguardar a tua aprovação.' },
+      { k: 'horas_previstas', l: 'Total de horas previstas do projeto', help: 'Aulas + mostras + espetáculos (ex.: 150). Serve para as horas em falta e a previsão do fim. Vazio = sem total.' },
+      { k: 'horas_coord', l: 'Horas de coordenação', help: 'Ex.: 42. São repartidas por igual pelas semanas com aulas no calendário de horas.' },
       { k: 'estado', l: 'Estado do projeto', type: 'select', opts: ESTADOS_PROJ, def: 'ativo', help: 'Só se podem eliminar dados pessoais de alunos quando todos os projetos que frequentaram estão Encerrados.' },
       { k: 'formulario_url', l: 'Link do formulário (https://…)', type: 'url' },
       { k: 'entidade_email', l: 'Email da entidade', type: 'email', help: 'Recebe um aviso quando um professor regista uma aula não prevista. Vazio = não envia nada.' },
@@ -1621,6 +1631,165 @@ async function eliminarCascataModal(sec, it, ps, fecha2) {
   const c = openSheet('Eliminar tudo em cascata', h('p', { style: 'margin-top:0' }, 'Vais apagar de vez «' + nm + '» e tudo o que depende dela:'), lista.length ? h('ul', { style: 'margin:8px 0 8px 18px' }, ...lista) : h('p', { class: 'mut' }, 'Não tem mais nada associado.'), h('p', { class: 'mut cap' }, 'Não se pode desfazer. Os professores não são apagados.'), h('label', { class: 'l' }, 'Escreve «' + nm + '» para confirmar'), inp, h('div', { style: 'height:10px' }), btn, h('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: () => c.close() }, 'Cancelar'));
 }
 /* N8: arquivo completo do projeto (ZIP no Drive), gerado por partes pelo servidor */
+function selTipo(v, onch) {
+  const s = h('select', { class: 'in', onchange: e => { if (onch) onch(e.target.value); } }, ...[['aula', 'Aula'], ['mostra', 'Mostra'], ['espetaculo', 'Espetáculo']].map(([k, l]) => h('option', { value: k }, l)));
+  s.value = v || 'aula'; return s;
+}
+/* Calendário de horas: aulas dadas e previstas, mostras/espetáculos, feriados/interrupções e coordenação (por projeto ou todos). */
+function calendarioHorasModal(projId) {
+  const box = h('div', {}, h('p', { class: 'mut' }, 'A carregar…'));
+  const s = openSheet('Calendário de horas', box);
+  const st = { proj: projId || '' };
+  const hh = m => { m = Math.round(m || 0); const H = Math.floor(m / 60), R = m % 60; return R ? H + 'h' + ('0' + R).slice(-2) : H + 'h'; };
+  const pct = (a, b) => b > 0 ? Math.round(100 * a / b) + '%' : '—';
+  const dm = d => d ? String(d).split('-').reverse().join('/') : '—';
+  const MESES = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro'];
+  const TIPOL = { feriado: 'Feriado', interrupcao: 'Interrupção', mostra: 'Mostra', espetaculo: 'Espetáculo', evento: 'Evento' };
+  const C = { dada: '#2e7d4f', dadaBg: '#e3f3e8', prev: '#8a8f98', prevBg: '#ffffff', ev: '#6b2d8f', evBg: '#efe5f6', bl: '#b9b2a9' };
+  const addD = (d, n) => { const t = new Date(d + 'T12:00:00Z'); t.setUTCDate(t.getUTCDate() + n); return t.toISOString().slice(0, 10); };
+  const wd = d => (new Date(d + 'T12:00:00Z').getUTCDay() + 6) % 7;
+  const escH = t => String(t || '').replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const nomeG = id => (grupoById(id) || {}).nome || '';
+  async function load() {
+    box.textContent = ''; box.append(h('p', { class: 'mut' }, 'A carregar…'));
+    let r; try { r = await API.calendarioHoras(st.proj); } catch (e) { box.textContent = e.server ? e.message : 'Sem ligação: o calendário precisa de rede.'; return; }
+    paint(r);
+  }
+  function paint(r) {
+    box.textContent = '';
+    const hoje = r.hoje || today();
+    const ps = (r.projetos || []).filter(p => st.proj || p.estado === 'ativo');
+    const sel = h('select', { class: 'in', onchange: e => { st.proj = e.target.value; load(); } }, h('option', { value: '' }, 'Todos os projetos ativos'), ...S.d.projetos.map(p => h('option', { value: p.id }, p.nome)));
+    sel.value = st.proj;
+    const area = h('div', {});
+    /* resumo */
+    let tot = 0, dad = 0, prev = 0, nD = 0, nP = 0, mo = 0, es = 0, co = 0, coR = 0, coS = 0;
+    ps.forEach(p => {
+      tot += p.minPrev; dad += p.minDadas; const falta = Math.max(0, p.minPrev - p.minDadas);
+      prev += p.minPrev ? Math.min(falta, p.minPlanAteLimite) : p.minPlanAteLimite;
+      nD += (p.dadas || []).length; nP += (p.plan || []).length; mo += p.porTipo.mostra; es += p.porTipo.espetaculo;
+      co += p.coord.min; coR += p.coord.real; coS += p.coord.porSemana;
+    });
+    const semH = Math.max(0, tot - dad - prev);
+    const card = (v, l, sub, cor) => h('div', { style: 'flex:1 1 30%;min-width:96px;text-align:center;padding:8px 4px;border-radius:10px;background:' + (cor || '#f6f1ec') }, h('div', { style: 'font-weight:800;font-size:20px' }, v), h('div', { style: 'font-size:12px;color:#6b625b' }, l), sub ? h('div', { style: 'font-size:12px;font-weight:700' }, sub) : null);
+    const barra = tot > 0 ? h('div', { style: 'display:flex;height:12px;border-radius:6px;overflow:hidden;background:#f0e7de;margin:8px 0 4px' },
+      h('i', { style: 'display:block;width:' + Math.min(100, 100 * dad / tot) + '%;background:' + C.dada }),
+      h('i', { style: 'display:block;width:' + Math.min(100, 100 * prev / tot) + '%;background:repeating-linear-gradient(135deg,#c9ccd2 0 4px,#e6e8eb 4px 8px)' })) : null;
+    area.append(
+      h('div', { style: 'display:flex;flex-wrap:wrap;gap:6px;margin-top:8px' },
+        card(hh(dad), 'horas dadas (' + nD + ' sessões)', pct(dad, tot), C.dadaBg),
+        card(hh(prev), 'previstas até ao limite (' + nP + ' aulas)', pct(prev, tot), '#eef0f3'),
+        card(hh(tot), 'total previsto', tot ? '100%' : 'sem total')),
+      barra,
+      h('div', { style: 'font-size:12px;color:#6b625b' }, [
+        mo ? 'Mostras dadas: ' + hh(mo) : '', es ? 'Espetáculos dados: ' + hh(es) : '',
+        semH > 0 ? '⚠ Sem horário para ' + hh(semH) + ' (' + pct(semH, tot) + ') até ao limite' : '',
+        co ? 'Coordenação: ' + hh(co) + ' (~' + hh(coS) + '/semana) · registadas ' + hh(coR) + ' (' + pct(coR, co) + ')' : ''].filter(Boolean).join(' · ')));
+    /* quadro por projeto */
+    if (ps.length > 1 || !st.proj) area.append(h('div', { style: 'overflow-x:auto;margin-top:10px' }, h('table', { style: 'width:100%;border-collapse:collapse;font-size:12px' },
+      h('tr', {}, ...['Projeto', 'Dadas', 'Previstas', 'Total', '% dado', 'Fim previsto', 'Limite'].map(x => h('th', { style: 'text-align:left;border-bottom:1px solid #e6dcd2;padding:4px' }, x))),
+      ...ps.map(p => { const pr = p.minPrev ? Math.min(Math.max(0, p.minPrev - p.minDadas), p.minPlanAteLimite) : p.minPlanAteLimite; const late = p.fim && (p.deficit > 0 || (p.previsao && p.previsao > p.fim));
+        return h('tr', {}, ...[p.nome, hh(p.minDadas), hh(pr), p.minPrev ? hh(p.minPrev) : '—', pct(p.minDadas, p.minPrev), p.previsao ? dm(p.previsao) : (p.deficit > 0 ? 'não chega' : '—'), dm(p.fim)].map((x, i) => h('td', { style: 'border-bottom:1px solid #f0e7de;padding:4px;' + (late && i === 5 ? 'color:#b45309;font-weight:700' : '') }, x))); }))));
+    /* legenda */
+    const sw = (bg, bd, t) => h('span', { style: 'display:inline-flex;align-items:center;gap:4px;margin-right:10px' }, h('i', { style: 'display:inline-block;width:14px;height:14px;border-radius:4px;background:' + bg + ';border:2px solid ' + bd }), t);
+    area.append(h('div', { style: 'font-size:12px;margin:12px 0 6px;line-height:2' },
+      sw(C.dadaBg, C.dada, 'aula dada'), sw(C.prevBg, C.prev, 'aula prevista'), sw(C.evBg, C.ev, 'mostra / espetáculo / evento'),
+      sw('repeating-linear-gradient(135deg,#d9d3cc 0 3px,#fff 3px 6px)', C.bl, 'feriado / interrupção'), h('span', {}, '▬ coordenação da semana')));
+    /* dias */
+    const D = {}; const dia = d => D[d] || (D[d] = { dadas: [], plan: [], ev: [], bl: [] });
+    ps.forEach(p => {
+      (p.dadas || []).forEach(x => dia(x.d).dadas.push(Object.assign({ p: p.nome }, x)));
+      (p.plan || []).forEach(x => dia(x.d).plan.push(Object.assign({ p: p.nome }, x)));
+      (p.eventos || []).forEach(x => dia(x.d).ev.push(Object.assign({ p: p.nome }, x)));
+    });
+    const bls = []; ps.forEach(p => (p.bloq || []).forEach(b => { if (!bls.some(z => z.id === b.id)) bls.push(b); }));
+    const coordW = {}; ps.forEach(p => (p.semanasCoord || []).forEach(w => { coordW[w] = (coordW[w] || 0) + p.coord.porSemana; }));
+    let ini = '', fim = '';
+    ps.forEach(p => { [p.inicio, p.fim].concat((p.dadas || []).map(x => x.d), (p.plan || []).map(x => x.d)).forEach(d => { if (!d) return; if (!ini || d < ini) ini = d; if (!fim || d > fim) fim = d; }); });
+    if (!ini) { area.append(h('p', { class: 'mut' }, 'Sem datas nem aulas para mostrar.')); }
+    else {
+      let ym = ini.slice(0, 7); const lastYm = fim.slice(0, 7);
+      for (let k = 0; ym <= lastYm && k < 30; k++) {
+        const [Y, M] = ym.split('-').map(Number); const first = ym + '-01';
+        const dias = new Date(Date.UTC(Y, M, 0)).getUTCDate();
+        const tbl = h('table', { style: 'width:100%;border-collapse:separate;border-spacing:3px;table-layout:fixed;font-size:12px' },
+          h('tr', {}, ...['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'].map(x => h('th', { style: 'font-weight:600;color:#8a817a;font-size:11px' }, x)), h('th', { style: 'width:46px;font-size:11px;color:#8a817a' }, 'Coord.')));
+        let d = addD(first, -wd(first));
+        let mH = 0, mP = 0;
+        while (d <= ym + '-' + String(dias).padStart(2, '0')) {
+          const tr = h('tr', {}); const seg = d;
+          for (let c = 0; c < 7; c++, d = addD(d, 1)) {
+            if (d.slice(0, 7) !== ym) { tr.append(h('td', {})); continue; }
+            const x = D[d] || { dadas: [], plan: [], ev: [] }; const b = bls.filter(z => d >= z.ini && d <= z.fim);
+            const tD = x.dadas.reduce((a, y) => a + y.min, 0), tP = x.plan.reduce((a, y) => a + y.min, 0); mH += tD; mP += tP;
+            const temEv = x.ev.length || x.dadas.some(y => y.tipo !== 'aula');
+            let bg = '#fff', bd = '#eee6dd';
+            if (b.length && !tD) { bg = 'repeating-linear-gradient(135deg,#ece6df 0 3px,#fff 3px 6px)'; bd = C.bl; }
+            if (tP) { bg = C.prevBg; bd = C.prev; }
+            if (tD) { bg = C.dadaBg; bd = C.dada; }
+            if (temEv) { bg = C.evBg; bd = C.ev; }
+            const tip = [].concat(b.map(z => (TIPOL[z.tipo] || '') + ': ' + z.nome), x.ev.map(y => (TIPOL[y.tipo] || '') + ': ' + y.nome + (y.min ? ' (' + hh(y.min) + ')' : '') + ' · ' + y.p),
+              x.dadas.map(y => '✓ ' + (y.tipo !== 'aula' ? (TIPOL[y.tipo] + ' ') : '') + y.h + ' ' + nomeG(y.g) + ' · ' + hh(y.min)), x.plan.map(y => '○ ' + y.h + ' ' + nomeG(y.g) + ' · ' + hh(y.min))).join('\n');
+            tr.append(h('td', { title: tip, style: 'vertical-align:top;height:38px;padding:2px 3px;border-radius:6px;border:2px solid ' + bd + ';background:' + bg + (d === hoje ? ';box-shadow:0 0 0 2px #B4441F' : '') },
+              h('div', { style: 'font-size:11px;color:#6b625b' }, String(+d.slice(8))),
+              tD ? h('div', { style: 'font-weight:800;color:' + C.dada }, (temEv ? '★ ' : '✓ ') + hh(tD)) : null,
+              !tD && tP ? h('div', { style: 'color:' + C.prev }, '○ ' + hh(tP)) : null,
+              !tD && x.ev.length ? h('div', { style: 'font-weight:700;color:' + C.ev }, x.ev.some(y => y.tipo === 'espetaculo') ? '🎭' : '★') : null,
+              b.length && !tD && !tP ? h('div', { style: 'font-size:10px;color:#8a817a;overflow:hidden;white-space:nowrap;text-overflow:ellipsis' }, b[0].nome) : null));
+          }
+          const cw = coordW[seg] || 0;
+          tr.append(h('td', { style: 'font-size:11px;color:#6b2d8f;text-align:center' }, cw ? '▬ ' + hh(cw) : ''));
+          tbl.append(tr);
+        }
+        area.append(h('div', { style: 'margin-top:12px;break-inside:avoid' }, h('div', { style: 'display:flex;justify-content:space-between;font-weight:700' }, h('span', {}, MESES[M - 1] + ' ' + Y), h('span', { style: 'font-weight:500;font-size:12px;color:#6b625b' }, (mH ? '✓ ' + hh(mH) : '') + (mH && mP ? ' · ' : '') + (mP ? '○ ' + hh(mP) : ''))), tbl));
+        ym = M === 12 ? (Y + 1) + '-01' : Y + '-' + String(M + 1).padStart(2, '0');
+      }
+    }
+    /* gestão: feriados, interrupções e eventos */
+    const proj1 = st.proj ? ps[0] : null;
+    const cal = (r.calendario || []).filter(c => !st.proj || !c.projeto_id || c.projeto_id === st.proj).sort((a, b) => a.data_ini.localeCompare(b.data_ini));
+    const novo = { tipo: 'feriado', nome: '', data_ini: '', data_fim: '', minutos: '', ambito: st.proj ? 'proj' : 'todos' };
+    const inp = (k, type, ph) => h('input', { class: 'in', type: type || 'text', placeholder: ph || '', oninput: e => { novo[k] = e.target.value; } });
+    const tipoN = h('select', { class: 'in', onchange: e => { novo.tipo = e.target.value; } }, ...Object.entries(TIPOL).map(([k, l]) => h('option', { value: k }, l)));
+    const ambN = h('select', { class: 'in', onchange: e => { novo.ambito = e.target.value; } }, h('option', { value: 'todos' }, 'Todos os projetos'), st.proj ? h('option', { value: 'proj' }, 'Só este projeto') : null); ambN.value = novo.ambito;
+    const gestCal = h('details', { style: 'margin-top:14px' }, h('summary', { style: 'min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:700' }, 'Feriados, interrupções e eventos (' + cal.length + ')'),
+      ...cal.map(c => h('div', { style: 'display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:13px;border-bottom:1px solid #f0e7de;padding:4px 0' },
+        h('span', {}, h('b', {}, (TIPOL[c.tipo] || c.tipo) + ' · '), c.nome + ' · ' + dm(c.data_ini) + (c.data_fim !== c.data_ini ? ' a ' + dm(c.data_fim) : '') + (c.minutos ? ' · ' + hh(c.minutos) : '') + (c.projeto_id ? ' · ' + ((projById(c.projeto_id) || {}).nome || '') : ' · todos')),
+        h('button', { class: 'btn small ghost', 'aria-label': 'Apagar', onclick: async () => { if (!(await confirmBox('Apagar entrada', 'Apagar «' + c.nome + '» do calendário?', 'Apagar'))) return; try { await API.calendarioDel(c.id); load(); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); } } }, '✕'))),
+      h('div', { style: 'margin-top:10px;display:grid;gap:6px' },
+        h('label', { class: 'l' }, 'Nova entrada'), tipoN, inp('nome', 'text', 'Nome (ex.: Natal, Mostra de Natal)'),
+        h('div', { style: 'display:flex;gap:6px' }, h('div', { style: 'flex:1' }, h('div', { class: 'mut', style: 'font-size:12px' }, 'De'), inp('data_ini', 'date')), h('div', { style: 'flex:1' }, h('div', { class: 'mut', style: 'font-size:12px' }, 'Até (opcional)'), inp('data_fim', 'date'))),
+        inp('minutos', 'number', 'Duração em minutos (só mostras/eventos que contam horas)'), ambN,
+        h('button', { class: 'btn primary', onclick: async () => {
+          const o = { tipo: novo.tipo, nome: novo.nome, data_ini: novo.data_ini, data_fim: novo.data_fim || novo.data_ini, minutos: novo.minutos, projeto_id: (novo.ambito === 'proj' || ['mostra', 'espetaculo', 'evento'].includes(novo.tipo)) ? st.proj : '' };
+          try { await API.calendarioSave([o]); toast('Guardado ✓'); load(); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); }
+        } }, 'Adicionar')));
+    /* coordenação registada (um projeto) */
+    let gestCo = null;
+    if (proj1) {
+      const nc = { data: today(), horas: '', desc: '' };
+      gestCo = h('details', { style: 'margin-top:8px' }, h('summary', { style: 'min-height:44px;display:flex;align-items:center;cursor:pointer;font-weight:700' }, 'Horas de coordenação registadas (' + hh(proj1.coord.real) + ' de ' + hh(proj1.coord.min) + ')'),
+        ...(proj1.coordRegs || []).sort((a, b) => b.d.localeCompare(a.d)).map(c => h('div', { style: 'display:flex;justify-content:space-between;gap:8px;align-items:center;font-size:13px;border-bottom:1px solid #f0e7de;padding:4px 0' },
+          h('span', {}, dm(c.d) + ' · ' + hh(c.min) + (c.desc ? ' · ' + c.desc : '')),
+          h('button', { class: 'btn small ghost', 'aria-label': 'Apagar', onclick: async () => { if (!(await confirmBox('Apagar registo', 'Apagar este registo de coordenação?', 'Apagar'))) return; try { await API.coordDel(c.id); load(); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); } } }, '✕'))),
+        h('div', { style: 'margin-top:10px;display:grid;gap:6px' },
+          h('div', { style: 'display:flex;gap:6px' }, h('input', { class: 'in', type: 'date', value: nc.data, oninput: e => { nc.data = e.target.value; } }), h('input', { class: 'in', type: 'number', step: '0.25', min: '0.25', placeholder: 'Horas (ex.: 1,5)', oninput: e => { nc.horas = e.target.value; } })),
+          h('input', { class: 'in', placeholder: 'O que foi feito (ex.: reunião com a Junta)', oninput: e => { nc.desc = e.target.value; } }),
+          h('button', { class: 'btn primary', onclick: async () => {
+            const m = Math.round(Number(String(nc.horas).replace(',', '.')) * 60);
+            try { await API.coordSave({ projeto_id: proj1.id, data: nc.data, minutos: m, descricao: nc.desc }); toast('Registado ✓'); load(); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); }
+          } }, 'Registar horas')));
+    }
+    const imprimir = h('button', { class: 'btn small ghost', onclick: () => {
+      const w = window.open('', '_blank'); if (!w) { toast('O browser bloqueou a janela de impressão.'); return; }
+      const titulo = st.proj ? ((projById(st.proj) || {}).nome || '') : 'Todos os projetos ativos';
+      w.document.write('<!DOCTYPE html><html lang="pt-PT"><head><meta charset="utf-8"><title>Calendário de horas · ' + escH(titulo) + '</title><style>body{font-family:Arial,sans-serif;color:#2B2320;margin:18px}h1{font-size:18px;margin:0 0 4px}@media print{button{display:none}}</style></head><body><h1>Calendário de horas · ' + escH(titulo) + '</h1><p style="font-size:12px;color:#6b625b">SGArtes · gerado a ' + dm(hoje) + '</p>' + area.outerHTML + '</body></html>');
+      w.document.close(); setTimeout(() => w.print(), 300);
+    } }, '🖨 Imprimir / PDF');
+    box.append(h('div', { style: 'display:flex;gap:8px;align-items:center' }, h('div', { style: 'flex:1' }, sel), imprimir), area, gestCal, gestCo);
+  }
+  load();
+}
 function painelProjetosModal() {
   const lista = h('div', {}, h('p', { class: 'mut' }, 'A carregar…'));
   const s = openSheet('Painel por projeto', lista);
@@ -1637,7 +1806,7 @@ function painelProjetosModal() {
         if (p.fim) { const f = dias(hoje, p.fim); if (f < 0) o.push('Prazo terminado há ' + (-f) + ' dia(s): falta entregar o relatório'); else if (f <= 30) o.push('Termina em ' + f + ' dia(s)'); }
         if (p.inicio && p.inicio <= hoje) { if (!p.aulas) o.push('Ainda sem aulas registadas'); else if (dias(p.ultima, hoje) > 21) o.push('Sem aulas há ' + dias(p.ultima, hoje) + ' dias'); }
       }
-      if (p.estado === 'ativo' && p.fim && p.minFalta > 0 && p.minHorario < p.minFalta) o.push('Pelo horário só se dão ' + hh(p.minHorario) + ' até ao fim; faltam ' + hh(p.minFalta - p.minHorario) + ' para as horas previstas');
+      if (p.estado === 'ativo' && p.fim && p.minFalta > 0 && p.minHorario < p.minFalta) o.push('Ao ritmo atual não chega: faltam ' + hh(p.minFalta - p.minHorario) + ' até à data limite (' + dm(p.fim) + ')');
       return o;
     };
     const hh = m => { const H = Math.floor((m || 0) / 60), R = Math.round((m || 0) % 60); return R ? H + 'h' + ('0' + R).slice(-2) : H + 'h'; };
@@ -1649,7 +1818,10 @@ function painelProjetosModal() {
       if (prev > 0) { cels.push(box(hh(prev), 'horas previstas')); cels.push(box(hh(falta), 'horas em falta', aperto)); }
       const nota = [];
       if (prev > 0) nota.push('Concluído: ' + Math.min(100, Math.round(100 * dadas / prev)) + '%'); else nota.push('Define o total de horas previstas na ficha do projeto para ver as horas em falta.');
-      if (p.estado === 'ativo' && p.minHorario) nota.push('Pelo horário das turmas ainda se dão cerca de ' + hh(p.minHorario) + ' até ao fim do período (estimativa, sem contar feriados)');
+      if (p.porTipo && (p.porTipo.mostra + p.porTipo.espetaculo)) nota.push('inclui ' + hh(p.porTipo.mostra + p.porTipo.espetaculo) + ' de mostras/espetáculos');
+      if (p.estado === 'ativo' && p.previsao) nota.push('Fim previsto das horas: ' + dm(p.previsao) + (p.fim ? (p.folgaDias >= 0 ? ' (' + Math.round(p.folgaDias / 7) + ' semana(s) antes do limite)' : ' (' + Math.round(-p.folgaDias / 7) + ' semana(s) depois do limite)') : ''));
+      else if (p.estado === 'ativo' && p.minHorario) nota.push('Pelo horário ainda se dão ' + hh(p.minHorario) + ' até ao limite');
+      if (p.coord && p.coord.min) nota.push('Coordenação ' + hh(p.coord.min) + ' (~' + hh(p.coord.porSemana) + '/semana) · registadas ' + hh(p.coord.real));
       return h('div', { style: 'margin:8px 0' }, h('div', { style: 'display:flex;flex-wrap:wrap;gap:6px' }, ...cels),
         prev > 0 ? h('div', { style: 'background:#f0e7de;border-radius:6px;height:10px;margin-top:6px' }, h('div', { style: 'width:' + Math.min(100, Math.round(100 * dadas / prev)) + '%;height:10px;border-radius:6px;background:var(--brand)' })) : null,
         h('div', { class: 'mut', style: 'font-size:12px;margin-top:4px' }, nota.join(' · ')));
@@ -1680,7 +1852,7 @@ function painelProjetosModal() {
         h('div', { style: 'display:flex;justify-content:space-between;gap:8px;align-items:baseline' }, h('b', {}, p.nome || p.id), h('span', { class: 'mut', style: 'font-size:13px' }, EST[p.estado] || p.estado)),
         h('p', { class: 'mut', style: 'margin:4px 0 8px;font-size:13px' }, dm(p.inicio) + ' a ' + dm(p.fim) + ' · ' + p.locais + ' local(is) · última aula: ' + dm(p.ultima)),
         ...av.map(x => h('div', { style: 'background:#fff1e0;color:#8a4b00;border-radius:10px;padding:6px 10px;font-size:13px;font-weight:600;margin-bottom:6px' }, x)),
-        horas(p),
+        horas(p), h('button', { class: 'btn small ghost', style: 'margin:0 0 8px', onclick: () => { s.close(); calendarioHorasModal(p.id); } }, '📅 Calendário de horas'),
         h('div', { style: 'display:flex;flex-wrap:wrap;gap:6px' },
           cel(p.aulas, 'aulas'), cel(p.aulas30, 'aulas (30 dias)'), cel(p.presencas, 'presenças'), cel(p.alunos, 'alunos'),
           cel(p.porAssinar, 'por assinar', p.porAssinar > 0, 'assin'), cel(p.aprovPend, 'por aprovar', p.aprovPend > 0, 'aprov'), cel(p.fotosPend, 'fotos por aprovar', p.fotosPend > 0, 'fotos'), cel(p.postsPend, 'posts pendentes', p.postsPend > 0)),
@@ -1744,6 +1916,7 @@ function viewGestao() {
     h('div', { class: 'seg', style: 'flex-wrap:wrap;margin-bottom:14px' }, ...['professores', 'projetos', 'locais', 'grupos'].map(k => h('button', { class: st.sec === k ? 'on' : '', style: 'min-width:46%;min-height:46px', onclick: () => { st.sec = k; render(); } }, GE[k].titulo))),
     h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => wizardProjeto() }, '✦ Criar projeto passo a passo'),
     st.sec === 'projetos' ? h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => painelProjetosModal() }, '📊 Painel por projeto') : null,
+    st.sec === 'projetos' ? h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => calendarioHorasModal('') }, '📅 Calendário de horas (todos)') : null,
     h('button', { class: 'btn primary', style: 'margin-bottom:14px', onclick: () => geForm(st.sec, null) }, '+ ' + spec.novo));
   const items = spec.items();
   if (!items.length) el.append(h('p', { class: 'mut' }, 'Ainda não há nada aqui.'));
@@ -1861,6 +2034,7 @@ async function aulaModal(x, reload) {
   let pres = null;
   if (g.com_lista === 'sim') { try { pres = (await API.presencas(x.id)).presencas; if (!pres.length) pres = null; } catch (e) { toast('Sem ligação: só consigo corrigir horário e totais.'); } }
   const st = { inicio: x.hora_inicio, dur: Number(x.duracao_min) || 60, h: Number(x.homens), m: Number(x.mulheres) };
+  const tipoSel = selTipo(x.tipo_sessao);
   const timeIn = h('input', { class: 'in', type: 'time', value: st.inicio, style: 'width:auto' });
   const durIn = h('input', { class: 'in', type: 'number', min: '15', step: '15', value: st.dur, style: 'width:110px' });
   const num = (v, k) => h('input', { class: 'in', type: 'number', min: '0', value: v, style: 'width:90px', oninput: e => { st[k] = Number(e.target.value) || 0; } });
@@ -1898,12 +2072,13 @@ async function aulaModal(x, reload) {
   const s = openSheet('Corrigir aula', head, ...gestorBox,
     h('label', { class: 'l', style: gest ? '' : 'margin-top:0' }, 'Hora de início'), timeIn, h('label', { class: 'l' }, 'Duração (minutos)'), durIn,
     pres ? [h('label', { class: 'l' }, 'Presenças (toca para mudar)'), presBox] : [h('label', { class: 'l' }, 'Homens · Mulheres'), h('div', { style: 'display:flex;gap:10px' }, num(st.h, 'h'), num(st.m, 'm'))],
+    h('label', { class: 'l' }, 'Tipo de sessão'), tipoSel,
     h('label', { class: 'l' }, 'Observações'), obs,
     h('button', { class: 'btn primary', style: 'margin-top:16px', onclick: async () => {
       const patch = { inicio: timeIn.value || st.inicio, duracaoMin: Number(durIn.value) || st.dur, observacoes: obs.value.trim() };
       if (pres) patch.presencas = pres.map(p => ({ alunoId: p.alunoId, presente: !!p.presente })); else { patch.homens = st.h; patch.mulheres = st.m; }
       if (gest) { patch.data = dateIn.value; patch.grupoId = grupoSel.value; patch.profId = profSel.value; patch.removerFotos = [...rem]; patch.novasFotos = novas; }
-      try { await API.editAula(x.id, patch); } catch (e) { toast(e.server ? e.message : 'Sem ligação. Corrigir aulas precisa de rede.'); return; }
+      patch.tipoSessao = tipoSel.value; try { await API.editAula(x.id, patch); } catch (e) { toast(e.server ? e.message : 'Sem ligação. Corrigir aulas precisa de rede.'); return; }
       s.close(); toast('Aula corrigida ✓'); reload();
     } }, 'Guardar correção'),
     h('button', { class: 'btn bad', style: 'margin-top:10px', onclick: async () => {
@@ -2065,7 +2240,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.27';
+const BUILD = 'v2.28';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
