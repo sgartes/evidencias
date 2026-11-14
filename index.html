@@ -403,6 +403,10 @@ const API = {
     if (IS_GS) return gs('apiEliminarCascata', tab, id, confirmar, texto);
     return { ok: true, nome: '', resumo: {} };
   },
+  async arquivoProjeto(projId, desde, parte, tag) {
+    if (IS_GS) return gs('apiArquivoProjeto', projId, desde, parte, tag);
+    return { ok: true, demo: true, parte: parte, proximo: 0, fim: true, total: 0, pastaUrl: '', ficheiro: '', falhas: [] };
+  },
   async eliminarEntidade(tab, id, confirmar) {
     if (IS_GS) return gs('apiEliminarEntidade', tab, id, confirmar);
     return { ok: true, pode: true, bloqueios: [], nome: '' };
@@ -1577,11 +1581,12 @@ function geForm(sec, it, opt) {
   const save = h('button', { class: 'btn primary', style: 'margin-top:18px', onclick: async () => {
     const obj = it ? { id: it.id } : {}; spec.fields().forEach(f => { obj[f.k] = inputs[f.k].value; });
     save.disabled = true; save.textContent = 'A guardar…'; err.textContent = '';
-    try { const rr = await API.adminSave(spec.tab, obj); s.close(); toast('Guardado ✓'); await reloadAll(); if (opt && opt.onDone) opt.onDone(rr && rr.id ? rr.id : (it && it.id), obj); }
+    try { const rr = await API.adminSave(spec.tab, obj); s.close(); toast('Guardado ✓'); await reloadAll(); if (sec === 'projetos' && it && obj.estado === 'relatorio_entregue' && it.estado !== 'relatorio_entregue') arquivoProjetoModal(it.id); if (opt && opt.onDone) opt.onDone(rr && rr.id ? rr.id : (it && it.id), obj); }
     catch (e) { err.textContent = e.server ? e.message : 'Sem ligação ao servidor. Tenta outra vez.'; save.disabled = false; save.textContent = 'Guardar'; }
   } }, 'Guardar');
   const del = it ? h('button', { class: 'btn bad', style: 'margin-top:10px', onclick: () => eliminarEntModal(sec, it, s) }, 'Eliminar…') : null;
-  const s = openSheet(it ? 'Editar' : spec.novo, ...body, err, save, del);
+  const arq = sec === 'projetos' && it && (it.estado === 'relatorio_entregue' || it.estado === 'encerrado') ? h('button', { class: 'btn ghost', style: 'margin-top:10px', onclick: () => arquivoProjetoModal(it.id) }, 'Arquivo completo (ZIP)…') : null;
+  const s = openSheet(it ? 'Editar' : spec.novo, ...body, err, save, arq, del);
 }
 /* ---------- ELIMINAR ENTIDADE + ASSISTENTE DE PROJETO ---------- */
 async function eliminarEntModal(sec, it, ps) {
@@ -1603,6 +1608,31 @@ async function eliminarCascataModal(sec, it, ps, fecha2) {
   const btn = h('button', { class: 'btn bad', disabled: true, onclick: async () => { btn.disabled = true; btn.textContent = 'A eliminar…'; try { await API.eliminarCascata(spec.tab, it.id, true, inp.value); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); btn.disabled = false; btn.textContent = 'Eliminar tudo definitivamente'; return; } c.close(); if (ps) ps.close(); if (fecha2) fecha2(); toast('Eliminado'); try { await reloadAll(); } catch (e) { } } }, 'Eliminar tudo definitivamente');
   inp.oninput = () => { btn.disabled = inp.value.trim().toLowerCase() !== nm.trim().toLowerCase(); };
   const c = openSheet('Eliminar tudo em cascata', h('p', { style: 'margin-top:0' }, 'Vais apagar de vez «' + nm + '» e tudo o que depende dela:'), lista.length ? h('ul', { style: 'margin:8px 0 8px 18px' }, ...lista) : h('p', { class: 'mut' }, 'Não tem mais nada associado.'), h('p', { class: 'mut cap' }, 'Não se pode desfazer. Os professores não são apagados.'), h('label', { class: 'l' }, 'Escreve «' + nm + '» para confirmar'), inp, h('div', { style: 'height:10px' }), btn, h('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: () => c.close() }, 'Cancelar'));
+}
+/* N8: arquivo completo do projeto (ZIP no Drive), gerado por partes pelo servidor */
+function arquivoProjetoModal(projId) {
+  const p = projById(projId); if (!p) return;
+  const st = h('p', { class: 'mut', style: 'margin:8px 0' }, 'Guarda no Drive (pasta Arquivo) um ZIP com as aulas, presenças, assinaturas, consentimentos RGPD, fotos e os PDFs das folhas de presença deste projeto. Contém dados pessoais: guarda-o em local seguro.');
+  const links = h('div', { style: 'margin-top:8px' });
+  const btn = h('button', { class: 'btn primary', onclick: async () => {
+    btn.disabled = true; btn.textContent = 'A gerar…'; links.textContent = '';
+    const tag = new Date().toISOString().slice(0, 10); let desde = 0, parte = 1, pasta = '', falhas = 0, ok = false;
+    try {
+      for (;;) {
+        st.textContent = 'A gerar a parte ' + parte + '… (não feches esta janela)';
+        const r = await API.arquivoProjeto(projId, desde, parte, tag);
+        pasta = r.pastaUrl || pasta; falhas += (r.falhas || []).length;
+        if (r.ficheiro) links.append(h('p', { style: 'margin:4px 0' }, h('a', { href: r.ficheiro, target: '_blank', rel: 'noopener' }, 'Parte ' + parte + ' (ZIP)')));
+        if (r.fim || r.demo) break;
+        desde = r.proximo; parte++;
+      }
+      ok = true;
+      st.textContent = 'Concluído ✓ ' + (falhas ? falhas + ' ficheiro(s) do Drive não foram encontrados.' : 'Todos os ficheiros foram incluídos.');
+      if (pasta) links.append(h('p', { style: 'margin:8px 0 0' }, h('a', { href: pasta, target: '_blank', rel: 'noopener' }, 'Abrir a pasta no Drive')));
+    } catch (e) { st.textContent = e.server ? e.message : 'Sem ligação ao servidor. Tenta outra vez (volta a gerar do início).'; }
+    btn.disabled = false; btn.textContent = ok ? 'Gerar outra vez' : 'Tentar outra vez';
+  } }, 'Gerar arquivo completo');
+  openSheet('Arquivo completo · ' + p.nome, st, btn, links);
 }
 function wizardProjeto() { S.wiz = S.wiz || {}; wizHub(S.wiz); }
 function wizHub(ctx) {
@@ -1955,7 +1985,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.22';
+const BUILD = 'v2.23';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
