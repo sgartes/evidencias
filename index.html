@@ -760,16 +760,16 @@ function pedidoBox(lid, its) {
 function pedidoModal(lid, ids, lembrete) {
   const nota = h('textarea', { class: 'in', placeholder: 'Nota opcional (ex.: obrigado pela colaboração)' });
   const prev = h('div', { class: 'card', style: 'margin-top:12px' }, h('p', { class: 'mut cap', style: 'margin:0' }, 'A preparar o email…'));
-  let tmr = null;
-  const paint = async () => { try { const r = await API.pedirAssinatura(lid, ids, nota.value, lembrete, true); if (!r || r.preview !== true) throw new Error('sem pré-visualização'); prev.replaceChildren(h('b', {}, 'Assim vai o email'), h('p', { class: 'cap', style: 'margin:8px 0 2px' }, 'Para: ' + (r.para || []).join(', ')), h('p', { class: 'cap', style: 'margin:0 0 2px' }, 'Cópia oculta e respostas: ' + (r.responder || r.bcc || '—')), h('p', { class: 'cap', style: 'margin:0 0 8px' }, 'Assunto: ' + r.assunto), h('div', { style: 'white-space:pre-wrap;font-size:13px;line-height:1.45' }, r.corpo)); } catch (e) { prev.replaceChildren(h('p', { class: 'mut cap', style: 'margin:0' }, 'Não consegui mostrar o email agora. Podes enviar na mesma.')); } };
+  let tmr = null, okPrev = false, btnEnviar = null;
+  const paint = async () => { try { const r = await API.pedirAssinatura(lid, ids, nota.value, lembrete, true); if (!r || r.preview !== true) throw new Error('sem pré-visualização'); if (!(r.para || []).length) throw new Error('nenhum destinatário'); okPrev = true; if (btnEnviar) btnEnviar.disabled = false; prev.replaceChildren(h('b', {}, 'Assim vai o email'), h('p', { class: 'cap', style: 'margin:8px 0 2px' }, 'Para: ' + (r.para || []).join(', ')), h('p', { class: 'cap', style: 'margin:0 0 2px' }, 'Cópia oculta e respostas: ' + (r.responder || r.bcc || '—')), h('p', { class: 'cap', style: 'margin:0 0 8px' }, 'Assunto: ' + r.assunto), h('div', { style: 'white-space:pre-wrap;font-size:13px;line-height:1.45' }, r.corpo)); } catch (e) { okPrev = false; if (btnEnviar) btnEnviar.disabled = true; prev.replaceChildren(h('b', {}, 'Não consegui confirmar para quem vai o email'), h('p', { class: 'cap', style: 'margin:6px 0 8px' }, 'Motivo: ' + (e && e.server ? e.message : (e && e.message) || 'sem ligação ao servidor') + '. O envio fica bloqueado até aparecerem os destinatários.'), h('button', { class: 'btn ghost', onclick: () => { prev.replaceChildren(h('p', { class: 'mut cap', style: 'margin:0' }, 'A preparar o email…')); paint(); } }, 'Tentar de novo')); } };
   nota.addEventListener('input', () => { clearTimeout(tmr); tmr = setTimeout(paint, 600); });
   const s = openSheet(lembrete ? 'Relembrar a entidade' : 'Pedir assinatura à distância',
     h('p', { class: 'mut' }, `Vai ser enviado um email aos funcionários de ${(localById(lid) || {}).nome || 'este local'} com ${ids.length} aula(s) por assinar. Entram na app com um código recebido no email.`),
     h('label', { class: 'l' }, 'Nota'), nota, prev,
-    h('button', { class: 'btn primary', style: 'margin-top:14px', onclick: async e => { const b = e.currentTarget; b.disabled = true;
+    (btnEnviar = h('button', { class: 'btn primary', style: 'margin-top:14px', disabled: true, onclick: async e => { const b = e.currentTarget; if (!okPrev) return; b.disabled = true;
       try { const r = await API.pedirAssinatura(lid, ids, nota.value, lembrete); S.d.pedidos = (S.d.pedidos || []).filter(p => p.local_id !== lid).concat([{ local_id: lid, criado_em: new Date().toISOString(), tipo: lembrete ? 'lembrete' : 'pedido', n: r.aulas }]);
         s.close(); toast(r.demo ? 'No modo real, o email segue para o funcionário.' : `Email enviado a ${r.enviados} funcionário(s) ✓`); render(); }
-      catch (err) { toast(err.server ? err.message : 'Sem ligação ao servidor.'); b.disabled = false; } } }, 'Enviar email'));
+      catch (err) { toast(err.server ? err.message : 'Sem ligação ao servidor.'); b.disabled = false; } } }, 'Enviar email')));
   paint();
 }
 function sigModal() {
@@ -2474,7 +2474,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.36';
+const BUILD = 'v2.37';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
