@@ -416,6 +416,8 @@ const API = {
   async calendarioHoras(projId) { if (IS_GS) return gs('apiCalendarioHoras', projId); return { ok: true, hoje: today(), projetos: [], calendario: [] }; },
   async fotosPublicadas(projId, estado, off) { if (IS_GS) return gs('apiFotosPublicadas', projId, estado, off); return { ok: true, total: 0, fotos: [] }; },
   async fotoThumbs(ids) { if (IS_GS) return gs('apiFotoThumbs', ids); return { ok: true, thumbs: {} }; },
+  async bannerLocal(id) { if (IS_GS) return gs('apiBannerLocal', id); return { ok: true, banner: '', fileId: '' }; },
+  async bannerLocalGuardar(id, dataUrl) { if (IS_GS) return gs('apiBannerLocalGuardar', id, dataUrl); return { ok: true, fileId: dataUrl ? 'DEMO-' + Date.now() : '' }; },
   async fotoMover(id, acao, projId) { if (IS_GS) return gs('apiFotoMover', id, acao, projId); return { ok: true }; },
   async calendarioSave(lista) { if (IS_GS) return gs('apiCalendarioSave', lista); return { ok: true }; },
   async calendarioDel(id) { if (IS_GS) return gs('apiCalendarioDel', id); return { ok: true }; },
@@ -1484,7 +1486,9 @@ function buildCaption(proj, loc, data) {
 async function bannerFor(loc, proj) {
   const key = (loc && loc.id) || '';
   if (S.banners[key] !== undefined) return S.banners[key];
-  let b = key ? await kv.get('banner2_' + key) : '';
+  let b = '';
+  if (loc && loc.banner_file_id) { const ck = 'bl_' + loc.banner_file_id; b = (await kv.get(ck)) || ''; if (!b) { try { b = (await API.bannerLocal(loc.id)).banner || ''; if (b) await kv.set(ck, b); } catch (e) { b = ''; } } }
+  if (!b && key) b = (await kv.get('banner2_' + key)) || '';
   if (!b && key) { try { const r = await fetch('banners/' + key + '.jpg'); if (r.ok) { const bl = await r.blob(); b = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(bl); }); if (b) await kv.set('banner2_' + key, b); } } catch (e) { b = ''; } }
   if (!b && proj && proj.tem_banner) { try { b = (await API.banner(proj.id)).banner || ''; } catch (e) { b = ''; } }
   S.banners[key] = b || ''; return S.banners[key];
@@ -1613,7 +1617,51 @@ function geForm(sec, it, opt) {
   } }, 'Guardar');
   const del = it ? h('button', { class: 'btn bad', style: 'margin-top:10px', onclick: () => eliminarEntModal(sec, it, s) }, 'Eliminar…') : null;
   const arq = sec === 'projetos' && it && (it.estado === 'relatorio_entregue' || it.estado === 'encerrado') ? h('button', { class: 'btn ghost', style: 'margin-top:10px', onclick: () => arquivoProjetoModal(it.id) }, 'Arquivo completo (ZIP)…') : null;
-  const s = openSheet(it ? 'Editar' : spec.novo, ...body, err, save, arq, del);
+  const ban = sec === 'locais' && it ? h('button', { class: 'btn ghost', style: 'margin-top:10px', onclick: () => openSheet('Banner · ' + it.nome, bannerLocalCard(it)) }, '🖼️ Banner deste local…') : null;
+  const s = openSheet(it ? 'Editar' : spec.novo, ...body, err, save, ban, arq, del);
+}
+/* ---------- 2.32: BANNER POR LOCAL ---------- */
+function bannersLocaisModal() {
+  const lista = h('div');
+  openSheet('Banners dos locais', h('p', { class: 'mut', style: 'margin-top:0' }, 'Cada local pode ter o seu banner. As fotos novas desse local saem sempre com o banner que estiver aqui. As fotos já publicadas mantêm o banner com que foram enviadas.'), lista);
+  const pn = l => (projById(l.projeto_id) || {}).nome || '';
+  S.d.locais.slice().sort((a, b) => pn(a).localeCompare(pn(b)) || String(a.nome).localeCompare(String(b.nome))).forEach(l => lista.append(bannerLocalCard(l)));
+}
+function prepBanner(file) {
+  return new Promise((res, rej) => {
+    const fr = new FileReader(); fr.onerror = rej;
+    fr.onload = () => { const im = new Image(); im.onerror = () => rej(new Error('Não consegui abrir essa imagem.'));
+      im.onload = () => { const w = Math.min(1600, im.naturalWidth), hh = Math.round(im.naturalHeight * w / im.naturalWidth), c = document.createElement('canvas'); c.width = w; c.height = hh;
+        const x = c.getContext('2d'); x.fillStyle = '#fff'; x.fillRect(0, 0, w, hh); x.drawImage(im, 0, 0, w, hh); res({ url: c.toDataURL('image/jpeg', 0.9), w: im.naturalWidth, h: im.naturalHeight }); };
+      im.src = fr.result; };
+    fr.readAsDataURL(file);
+  });
+}
+function bannerLocalCard(l) {
+  const box = h('div', { class: 'card', style: 'margin-bottom:10px;display:block' });
+  const paint = async (msg) => {
+    const proj = projById(l.projeto_id);
+    box.replaceChildren(h('b', {}, l.nome), h('div', { class: 'mut cap' }, (proj || {}).nome || ''), h('p', { class: 'mut cap' }, msg || 'A carregar…'));
+    delete S.banners[l.id];
+    let b = ''; try { b = await bannerFor(l, proj); } catch (e) { b = ''; }
+    const fonte = l.banner_file_id ? 'Banner próprio deste local.' : b ? ((await kv.get('banner2_' + l.id)) ? 'Banner antigo (ficheiro do site). Podes substituí-lo aqui.' : 'Sem banner próprio: usa o banner do projeto.') : 'Sem banner: as fotos saem sem banner.';
+    const err = h('p', { style: 'color:#c0392b;font-weight:700;margin:8px 0 0' });
+    const inp = h('input', { type: 'file', accept: 'image/*', style: 'display:none', onchange: async e => {
+      const f = e.target.files && e.target.files[0]; if (!f) return; err.textContent = '';
+      try { const p = await prepBanner(f); if (p.w < 600) throw new Error('Imagem muito pequena (' + p.w + ' px de largura). Usa pelo menos 1080 px.');
+        paint('A enviar o banner…'); const r = await API.bannerLocalGuardar(l.id, p.url);
+        l.banner_file_id = r.fileId || ''; await kv.set('bl_' + r.fileId, p.url); delete S.banners[l.id]; toast('Banner guardado ✓'); paint(); }
+      catch (e2) { err.textContent = e2.message || 'Não foi possível guardar.'; }
+    } });
+    box.replaceChildren(h('b', {}, l.nome), h('div', { class: 'mut cap' }, (proj || {}).nome || ''), h('p', { class: 'mut cap', style: 'margin:6px 0' }, fonte),
+      b ? h('img', { src: b, alt: 'Banner de ' + l.nome, style: 'width:100%;border-radius:8px;border:1px solid var(--line);display:block' }) : null,
+      h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap;margin-top:10px' },
+        h('button', { class: 'btn small primary', onclick: () => inp.click() }, b ? 'Trocar banner…' : 'Escolher banner…'),
+        l.banner_file_id ? h('button', { class: 'btn small ghost', onclick: async ev => { const bt = ev.currentTarget; if (!bt.dataset.ok) { bt.dataset.ok = '1'; bt.textContent = 'Tocar de novo para remover'; return; } try { await API.bannerLocalGuardar(l.id, ''); l.banner_file_id = ''; toast('Banner removido'); paint(); } catch (e) { err.textContent = e.server ? e.message : 'Sem ligação.'; } } }, 'Remover') : null),
+      inp, err);
+  };
+  paint();
+  return box;
 }
 /* ---------- ELIMINAR ENTIDADE + ASSISTENTE DE PROJETO ---------- */
 async function eliminarEntModal(sec, it, ps) {
@@ -1972,6 +2020,7 @@ function viewGestao() {
     st.sec === 'projetos' ? h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => painelProjetosModal() }, '📊 Painel por projeto') : null,
     st.sec === 'projetos' ? h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => calendarioHorasModal('') }, '📅 Calendário de horas (todos)') : null,
     st.sec === 'projetos' ? h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => fotosPublicadasModal('') }, '🖼️ Fotos publicadas') : null,
+    st.sec === 'locais' ? h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => bannersLocaisModal() }, '🖼️ Banners dos locais') : null,
     h('button', { class: 'btn primary', style: 'margin-bottom:14px', onclick: () => geForm(st.sec, null) }, '+ ' + spec.novo));
   const items = spec.items();
   if (!items.length) el.append(h('p', { class: 'mut' }, 'Ainda não há nada aqui.'));
@@ -2309,7 +2358,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.31';
+const BUILD = 'v2.32';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
