@@ -1543,7 +1543,8 @@ const GE = {
       { k: 'projeto_id', l: 'Projeto', type: 'select', opts: () => S.d.projetos.map(p => [p.id, p.nome]) },
       { k: 'nome', l: 'Nome do local' }, { k: 'morada', l: 'Morada' },
       { k: 'responsaveis', l: 'Responsáveis do local', help: 'Quem assina as presenças. Separa os nomes com ponto e vírgula (;).' },
-      { k: 'nome_no_formulario', l: 'Nome no formulário', help: 'Só se o formulário da entidade usar um nome diferente.' }]
+      { k: 'nome_no_formulario', l: 'Nome no formulário', help: 'Só se o formulário da entidade usar um nome diferente.' },
+      { k: 'pasta_fotos', l: 'Pasta de fotos publicadas (link do Drive)', help: 'A subpasta deste local que o site mostra. As fotos chegam com banner e vão direto para aqui. Partilha-a como Editor com a conta da app. Vazio = ficam por aprovar.' }]
   },
   grupos: {
     tab: 'Grupos', titulo: 'Turmas', novo: 'Nova turma',
@@ -1582,7 +1583,6 @@ const GE = {
       { k: 'data_inicio', l: 'Início das aulas', type: 'date' }, { k: 'data_fim', l: 'Data limite de execução', type: 'date', help: 'Data limite do contrato. Aulas fora destas datas ficam a aguardar a tua aprovação.' },
       { k: 'horas_previstas', l: 'Total de horas previstas do projeto', help: 'Aulas + mostras + espetáculos (ex.: 150). Serve para as horas em falta e a previsão do fim. Vazio = sem total.' },
       { k: 'horas_coord', l: 'Horas de coordenação', help: 'Ex.: 42. São repartidas por igual pelas semanas com aulas no calendário de horas.' },
-      { k: 'pasta_fotos', l: 'Pasta de fotos publicadas (link do Drive)', help: 'As fotos chegam com banner e vão direto para esta pasta (a que o site lê). Partilha-a como Editor com a conta da app. Vazio = ficam por aprovar.' },
       { k: 'pasta_retiradas', l: 'Pasta de fotos retiradas (opcional)', help: 'Para onde vão as fotos que retirares do ar. Vazio = pasta «Não publicadas» do Drive da app.' },
       { k: 'estado', l: 'Estado do projeto', type: 'select', opts: ESTADOS_PROJ, def: 'ativo', help: 'Só se podem eliminar dados pessoais de alunos quando todos os projetos que frequentaram estão Encerrados.' },
       { k: 'formulario_url', l: 'Link do formulário (https://…)', type: 'url' },
@@ -1822,11 +1822,11 @@ function fotosPublicadasModal(projId) {
       toast(acao === 'despublicar' ? 'Foto retirada do ar ✓' : 'Foto publicada ✓'); card.remove(); info.textContent = '';
     };
     if (st.estado === 'publicada') {
-      const sel = h('select', { class: 'in', style: 'margin:4px 0' }, ...projs.map(p => h('option', { value: p.id }, p.nome)));
-      sel.value = f.projeto_id;
+      const sel = h('select', { class: 'in', style: 'margin:4px 0' }, ...(S.d.locais || []).map(l => h('option', { value: l.id }, l.nome + (nomeP(l.projeto_id) ? ' · ' + nomeP(l.projeto_id) : ''))));
+      sel.value = f.local_id;
       card.append(h('button', { class: 'btn ghost', style: 'width:100%;margin-top:2px', onclick: () => mover('despublicar') }, 'Retirar do ar'),
         h('details', {}, h('summary', { class: 'mut', style: 'font-size:12px;cursor:pointer;margin-top:4px' }, 'Mudar de pasta'), sel,
-          h('button', { class: 'btn ghost', style: 'width:100%', onclick: () => mover('publicar', sel.value) }, 'Mover para o projeto')));
+          h('button', { class: 'btn ghost', style: 'width:100%', onclick: () => mover('publicar', sel.value) }, 'Mover para este local')));
     } else card.append(h('button', { class: 'btn', style: 'width:100%;margin-top:2px', onclick: () => mover('publicar') }, 'Publicar de novo'));
     card.append(h('a', { href: f.url, target: '_blank', rel: 'noopener', class: 'mut', style: 'font-size:12px;display:block;margin-top:4px' }, 'Abrir no Drive'));
     return { card, img };
@@ -2295,7 +2295,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.29';
+const BUILD = 'v2.30';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
