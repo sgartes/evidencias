@@ -347,6 +347,8 @@ const API = {
   async login(cred) { return gs('login', cred); },
   async pedirCodigo(email) { return gs('pedirCodigo', email); },
   async entrarCodigo(email, codigo) { return gs('entrarCodigo', email, codigo); },
+  async entrarLink(tk) { return gs('entrarLink', tk); },
+  async linkFuncionario(pid) { if (IS_GS) return gs('apiLinkFuncionario', pid); return { ok: true, url: 'https://evidencias.sgartes.pt/#entrar=demo' }; },
   async pedirAssinatura(localId, ids, nota, lembrete, preview) { if (IS_GS) return gs('apiPedirAssinatura', localId, ids, nota, lembrete, preview); if (preview) return { ok: true, preview: true, para: ['funcionario@exemplo.pt'], responder: 'geral@sgartes.pt', assunto: 'Assinatura de aulas (exemplo)', corpo: 'Bom dia, (modo de demonstração: no modo real aparece aqui o texto do email, com a lista das aulas.)' }; return { ok: true, enviados: 1, aulas: ids.length, demo: true }; },
   async proporAluno(a) { if (IS_GS) return gs('apiProporAluno', a); return { ok: true, demo: true, alteracao: { id: 'AL-demo-' + Date.now(), tipo: DEMO.alunos.some(z => z.id === a.id) ? 'editar' : 'novo', aluno_id: a.id, estado: 'pendente', criado_em: new Date().toISOString(), nome: a.nome, local_id: a.local_id } }; },
   async decidirAlteracao(id, ok) { if (IS_GS) return gs('apiDecidirAlteracao', id, ok); return { ok: true, demo: true }; },
@@ -719,7 +721,7 @@ function viewAlunosFunc() {
     h('button', { class: 'btn primary', onclick: () => alunoModal(null, { localId: locId, onSave: proporAlunoFunc }) }, '＋ Propor novo aluno'), h('div', { style: 'height:12px' }));
   const lista = h('div', { class: 'card', style: 'padding:6px 16px' });
   lista.replaceChildren(...(rows.length ? rows.map(a => h('button', { class: 'row', style: 'width:100%;background:none;border:0;text-align:left;border-bottom:1px solid var(--line)', onclick: () => alunoModal(a, { onSave: proporAlunoFunc }) },
-    avatar(a), h('div', { class: 'grow' }, h('b', {}, a.nome), h('div', { class: 'mut cap' }, `${a.genero === 'H' ? 'Homem' : a.genero === 'M' ? 'Mulher' : 'Género por indicar'} · ${a.grupo_id ? ((grupoById(a.grupo_id) || {}).nome || 'grupo') : 'sem grupo'}${a.ativo === 'nao' ? ' · inativo' : ''}`)),
+    avatar(a), h('div', { class: 'grow' }, h('b', {}, a.nome), h('div', { class: 'mut cap' }, `${a.genero === 'H' ? 'Homem' : a.genero === 'M' ? 'Mulher' : 'Género por indicar'} · ${a.grupo_id ? ((grupoById(a.grupo_id) || {}).nome || 'grupo') : 'sem grupo'}${a.ativo === 'nao' ? ' · inativo' : ''}${a.rgpd_estado === 'recusado' ? ' · recusou RGPD' : RGPD_OK.includes(a.rgpd_estado) ? '' : ' · 🔏 RGPD por assinar'}`)),
     pend[a.id] ? h('span', { class: 'chip warn' }, 'Pedido a aguardar') : null)) : [h('p', { class: 'mut' }, 'Ainda não há alunos neste local.')]));
   el.append(lista);
   if (alts.length) el.append(h('h2', { style: 'margin:18px 0 6px' }, 'Os seus pedidos'), h('div', { class: 'card', style: 'padding:6px 16px' }, ...alts.slice().sort((x, y) => String(y.criado_em).localeCompare(String(x.criado_em))).map(x => h('div', { class: 'row', style: 'padding:8px 0;border-bottom:1px solid var(--line)' },
@@ -729,12 +731,30 @@ function viewAlunosFunc() {
   return el;
 }
 /* N1: o gestor pede a assinatura à distância aos funcionários do local */
+/* 2.36: link de entrada para o funcionário, por WhatsApp (o email para contas externas está bloqueado pelo DMARC). */
+function linkFuncBtn(lid) {
+  const fs_ = ((S.d.gestao && S.d.gestao.professores) || []).filter(p => p.papel === 'funcionario' && p.ativo !== 'nao' && String(p.locais || '').split(/[;,\s]+/).includes(lid));
+  if (!fs_.length) return h('p', { class: 'mut cap', style: 'margin:6px 0 0' }, 'Este local ainda não tem funcionário registado (Gestão → Professores).');
+  return h('div', {}, ...fs_.map(p => h('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: async e => {
+    const b = e.currentTarget; b.disabled = true;
+    try {
+      const r = await API.linkFuncionario(p.id);
+      const txt = `Olá ${firstName(p.nome)}! Para confirmar as aulas da SGArtes no vosso espaço, abra este link no telemóvel (válido 6 horas, só funciona uma vez): ${r.url}`;
+      openSheet('Link de entrada · ' + p.nome, h('p', { class: 'mut', style: 'margin-top:0' }, 'Envia este link ao funcionário por WhatsApp. Abre a app já com a sessão iniciada, só com as aulas do local dele. Vale 6 horas e só funciona uma vez.'),
+        h('div', { class: 'card', style: 'word-break:break-all;font-size:13px' }, r.url),
+        h('button', { class: 'btn primary', onclick: () => window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank') }, 'Enviar por WhatsApp'),
+        h('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: async () => toast((await copyText(txt)) ? 'Mensagem copiada ✓' : 'Não consegui copiar.') }, 'Copiar a mensagem'));
+    } catch (err) { toast(err.server ? err.message : 'Sem ligação ao servidor.'); }
+    b.disabled = false;
+  } }, `📲 Link de entrada para ${firstName(p.nome)} (WhatsApp)`)));
+}
 function pedidoBox(lid, its) {
   const ped = (S.d.pedidos || []).find(p => p.local_id === lid), ids = its.map(x => x.aulaId).filter(Boolean);
   const dias = ped ? Math.max(0, Math.floor((Date.now() - Date.parse(ped.criado_em)) / 864e5)) : 0, lembrar = !!ped && dias >= 5;
   return h('div', { style: 'margin-top:8px' },
     ped ? h('p', { class: 'mut cap', style: 'margin:0 0 6px' + (lembrar ? ';color:var(--warn);font-weight:700' : '') }, `${ped.tipo === 'lembrete' ? 'Lembrete' : 'Pedido'} enviado a ${fmtShort(String(ped.criado_em).slice(0, 10))} (há ${dias} dia${dias === 1 ? '' : 's'})${lembrar ? ' · ainda sem resposta' : ''}`) : null,
     h('button', { class: 'btn ghost', disabled: ids.length ? null : true, onclick: () => pedidoModal(lid, ids, !!ped) }, lembrar ? 'Relembrar a entidade' : ped ? 'Enviar outra vez ao funcionário' : 'Pedir assinatura ao funcionário'),
+    linkFuncBtn(lid),
     ids.length < its.length ? h('p', { class: 'mut cap', style: 'margin:4px 0 0' }, `${its.length - ids.length} aula(s) ainda por sincronizar ficam de fora.`) : null);
 }
 function pedidoModal(lid, ids, lembrete) {
@@ -843,9 +863,13 @@ function viewFotos() {
     });
     const guardar = async e => {
       const b = e.currentTarget; b.disabled = true;
-      try { await API.decidirFotos(a.aula_id, a.fotos.filter(f => dec[f.id] === 'pub').map(f => f.id), a.fotos.filter(f => dec[f.id] === 'nao').map(f => f.id)); }
+      let rd;
+      try { rd = await API.decidirFotos(a.aula_id, a.fotos.filter(f => dec[f.id] === 'pub').map(f => f.id), a.fotos.filter(f => dec[f.id] === 'nao').map(f => f.id)); }
       catch (err) { toast(err.server ? err.message : 'Sem ligação ao servidor.'); b.disabled = false; return; }
-      S.d.fotosPend = S.d.fotosPend.filter(x => x.aula_id !== a.aula_id); toast('Decisão guardada ✓'); render();
+      if (IS_GS && rd && !rd.decididas) { toast('Nada foi alterado: estas fotos já não estavam por aprovar. Atualiza a página.'); b.disabled = false; return; }
+      const pubs = ((rd && rd.pastas) || []).filter(x => /^publicada:/.test(x)).map(x => x.slice(10));
+      S.d.fotosPend = S.d.fotosPend.filter(x => x.aula_id !== a.aula_id);
+      toast(pubs.length ? `${pubs.length} foto(s) publicada(s) na pasta «${[...new Set(pubs)].join('», «')}» ✓` : 'Decisão guardada ✓'); render();
     };
     el.append(h('div', { class: 'card' }, h('b', {}, `${l.nome || ''} · ${DIAS[dow(a.data)]} ${fmtShort(a.data)} · ${a.hora_inicio}`), h('div', { class: 'mut cap' }, `${(profById(a.prof_deu_id) || {}).nome || ''} · ${a.fotos.length} foto(s)`),
       a.crianca ? h('div', { style: 'margin-top:6px' }, h('span', { class: 'chip warn' }, 'Crianças presentes · sugestão: não publicar')) : null,
@@ -1052,7 +1076,7 @@ function signModal(startLocal) {
 function groupLine(g) { const l = localById(g.local_id); return `${g.hora_inicio} · ${durTxt(g.duracao_min || 60)}${g.nome && g.nome !== l.nome ? ' · ' + g.nome : ''}`; }
 function nextCard(g) {
   const l = localById(g.local_id);
-  return h('div', { class: 'card hero' }, h('div', { class: 'cap mut' }, 'Próxima aula'), h('div', { class: 'hero-t' }, l.nome), h('div', { class: 'mut' }, groupLine(g)),
+  return h('div', { class: 'card hero' }, h('div', { class: 'cap mut' }, 'Próxima aula'), h('div', { class: 'hero-t' }, l.nome), h('div', { class: 'mut' }, groupLine(g)), (() => { const n = S.d.alunos.filter(a => a.ativo !== 'nao' && a.local_id === g.local_id && (!a.grupo_id || a.grupo_id === g.id) && semRgpdA(a)).length; return g.com_lista === 'sim' && n ? h('div', { style: 'margin-top:6px' }, h('span', { class: 'chip rgpd' }, `🔏 ${n} aluno(s) sem RGPD nesta turma`)) : null; })(),
     h('button', { class: 'btn primary', style: 'margin-top:14px', onclick: () => startFlow(g, today()) }, '📸 Enviar evidências'),
     h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => semAulaModal(g, today()) }, 'Hoje não houve aula'), h('button', { class: 'link', onclick: () => avisarModal(g, today(), 'lembrete') }, 'Avisar a turma'), h('button', { class: 'link', onclick: () => atribuirModal(g, today()) }, 'Atribuir a outro professor')));
 }
@@ -1667,16 +1691,25 @@ function geForm(sec, it, opt) {
     inputs[f.k] = el;
     return [h('label', { class: 'l' }, f.l), el, f.help ? h('p', { class: 'mut cap', style: 'margin:6px 0 0' }, f.help) : null];
   });
+  let banF = '';
+  const banNovo = sec === 'locais' && !it ? (() => {
+    const prev = h('div', { class: 'mut cap', style: 'margin-top:6px' }, 'Sem banner escolhido (também podes pôr depois).');
+    const inp = h('input', { type: 'file', accept: 'image/*', style: 'display:none', onchange: async e => { const f = e.target.files && e.target.files[0]; e.target.value = ''; if (!f) return;
+      try { const p = await prepBanner(f); if (p.w < 600) throw new Error('Imagem muito pequena (' + p.w + ' px de largura). Usa pelo menos 1080 px.'); banF = p.url; prev.replaceChildren(h('img', { src: p.url, alt: 'Banner escolhido', style: 'width:100%;border-radius:8px;display:block;margin-top:6px' })); } catch (er) { toast(er.message); } } });
+    return h('div', {}, h('label', { class: 'l' }, 'Banner do local (opcional)'), h('button', { class: 'btn small ghost', type: 'button', onclick: () => inp.click() }, '🖼️ Escolher banner…'), inp, prev);
+  })() : null;
   const save = h('button', { class: 'btn primary', style: 'margin-top:18px', onclick: async () => {
     const obj = it ? { id: it.id } : {}; spec.fields().forEach(f => { obj[f.k] = inputs[f.k].value; });
     save.disabled = true; save.textContent = 'A guardar…'; err.textContent = '';
-    try { const rr = await API.adminSave(spec.tab, obj); s.close(); toast('Guardado ✓'); await reloadAll(); if (sec === 'projetos' && it && obj.estado === 'relatorio_entregue' && it.estado !== 'relatorio_entregue') arquivoProjetoModal(it.id); if (opt && opt.onDone) opt.onDone(rr && rr.id ? rr.id : (it && it.id), obj); }
+    try { const rr = await API.adminSave(spec.tab, obj); const novoId = rr && rr.id ? rr.id : (it && it.id);
+      if (banF && novoId) { save.textContent = 'A guardar o banner…'; try { const br = await API.bannerLocalGuardar(novoId, banF); if (br && br.fileId) await kv.set('bl_' + br.fileId, banF); } catch (e2) { toast('O local ficou guardado, mas o banner falhou. Tenta outra vez na ficha do local.'); } }
+      save.textContent = 'A atualizar a lista…'; await reloadAll(); s.close(); toast('Guardado ✓'); if (sec === 'projetos' && it && obj.estado === 'relatorio_entregue' && it.estado !== 'relatorio_entregue') arquivoProjetoModal(it.id); if (opt && opt.onDone) opt.onDone(rr && rr.id ? rr.id : (it && it.id), obj); }
     catch (e) { err.textContent = e.server ? e.message : 'Sem ligação ao servidor. Tenta outra vez.'; save.disabled = false; save.textContent = 'Guardar'; }
   } }, 'Guardar');
   const del = it ? h('button', { class: 'btn bad', style: 'margin-top:10px', onclick: () => eliminarEntModal(sec, it, s) }, 'Eliminar…') : null;
   const arq = sec === 'projetos' && it && (it.estado === 'relatorio_entregue' || it.estado === 'encerrado') ? h('button', { class: 'btn ghost', style: 'margin-top:10px', onclick: () => arquivoProjetoModal(it.id) }, 'Arquivo completo (ZIP)…') : null;
   const ban = sec === 'locais' && it ? h('button', { class: 'btn ghost', style: 'margin-top:10px', onclick: () => openSheet('Banner · ' + it.nome, bannerLocalCard(it)) }, '🖼️ Banner deste local…') : null;
-  const s = openSheet(it ? 'Editar' : spec.novo, ...body, err, save, ban, arq, del);
+  const s = openSheet(it ? 'Editar' : spec.novo, ...body, banNovo, err, save, ban, arq, del);
 }
 /* ---------- 2.32: BANNER POR LOCAL ---------- */
 function bannersLocaisModal() {
@@ -2124,15 +2157,16 @@ function viewAlunos() {
   const list = h('div', { class: 'card', style: 'padding:6px 16px' });
   const paint = () => {
     const q = st.q.trim().toLowerCase();
-    const rows = S.d.alunos.filter(a => (!st.localId || a.local_id === st.localId) && (!q || a.nome.toLowerCase().includes(q))).sort(byName);
+    const rows = S.d.alunos.filter(a => (!st.localId || a.local_id === st.localId) && (!q || a.nome.toLowerCase().includes(q)) && (!st.semRgpd || semRgpdA(a))).sort(byName);
     list.replaceChildren(...(rows.length ? rows.map(a => h('button', { class: 'row', style: 'width:100%;background:none;border:0;text-align:left;border-bottom:1px solid var(--line)', onclick: () => alunoModal(a, { onSave: saveAlunoEdit }) },
-      avatar(a), h('div', { class: 'grow' }, h('b', {}, a.nome), h('div', { class: 'mut cap' }, `${a.genero === 'H' ? 'Homem' : a.genero === 'M' ? 'Mulher' : 'Género por indicar'} · ${a.grupo_id ? ((grupoById(a.grupo_id) || {}).nome || 'grupo') : 'sem grupo'}${a.ativo === 'nao' ? ' · inativo' : ''}`))))
+      avatar(a), h('div', { class: 'grow' }, h('b', {}, a.nome), h('div', { class: 'mut cap' }, `${a.genero === 'H' ? 'Homem' : a.genero === 'M' ? 'Mulher' : 'Género por indicar'} · ${a.grupo_id ? ((grupoById(a.grupo_id) || {}).nome || 'grupo') : 'sem grupo'}${a.ativo === 'nao' ? ' · inativo' : ''}${a.rgpd_estado === 'recusado' ? ' · recusou RGPD' : RGPD_OK.includes(a.rgpd_estado) ? '' : ' · 🔏 RGPD por assinar'}`))))
       : [h('p', { class: 'mut' }, 'Nenhum aluno encontrado.')]));
   };
   const sel = localPick({ all: true, onchange: e => { st.localId = e.target.value; paint(); } }); sel.value = st.localId;
   el.append(h('h1', {}, 'Alunos'),
     h('button', { class: 'btn primary', onclick: () => alunoModal(null, { localId: st.localId, onSave: saveAlunoEdit }) }, '＋ Novo aluno'), h('div', { style: 'height:12px' }), sel, h('div', { style: 'height:8px' }),
-    h('input', { class: 'in', placeholder: 'Procurar por nome', value: st.q, oninput: e => { st.q = e.target.value; paint(); } }), h('div', { style: 'height:12px' }), list);
+    h('input', { class: 'in', placeholder: 'Procurar por nome', value: st.q, oninput: e => { st.q = e.target.value; paint(); } }),
+    h('div', { class: 'tools', style: 'justify-content:flex-start;margin:10px 0 0' }, h('button', { class: 'pill' + (st.semRgpd ? ' on' : ''), onclick: () => { st.semRgpd = !st.semRgpd; render(); } }, `🔏 Só sem RGPD (${S.d.alunos.filter(a => a.ativo !== 'nao' && semRgpdA(a)).length})`)), h('div', { style: 'height:12px' }), list);
   paint(); return el;
 }
 async function saveAlunoEdit(a) {
@@ -2412,19 +2446,27 @@ async function refreshData(force) {
 }
 async function main() {
   S.collapse = await kv.get('collapse', {}); S.queue = await kv.get('queue', []); S.recent = await kv.get('recent', []);
+  if (IS_GS && /^#entrar=/.test(location.hash)) {
+    /* 2.36: link de entrada do funcionário (enviado pelo gestor por WhatsApp) */
+    const tk = location.hash.slice(8); try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { }
+    try { const r0 = await API.entrarLink(tk); TOKEN = r0.token; await kv.set('token', TOKEN); await kv.del('boot'); }
+    catch (e) { renderLogin(e.message || 'Link de entrada inválido.'); return; }
+  }
   if (IS_GS) { TOKEN = await kv.get('token', ''); if (!TOKEN) { renderLogin(); return; } }
   const app = $('#app');
   const cached = IS_GS ? await kv.get('boot', null) : null;
-  if (!cached) app.replaceChildren(h('div', { style: 'padding:40px 20px;text-align:center' }, h('b', {}, 'A abrir…')));
   let r;
-  try { r = await API.boot(); if (IS_GS) await kv.set('boot', r); }
-  catch (e) {
-    if (e.auth) return;
-    if (cached) { r = cached; toast('Sem rede: a usar os dados guardados neste telemóvel.'); }
-    else { app.replaceChildren(h('div', { style: 'padding:30px 20px' }, h('h1', {}, 'Não consegui abrir'), h('p', { class: 'mut' }, (e && e.message) || String(e)), h('p', { class: 'mut' }, 'Confirma que tens rede e tenta outra vez.'), h('button', { class: 'btn primary', onclick: () => location.reload() }, 'Tentar outra vez'))); return; }
+  if (cached) {
+    /* 2.36: abre logo com os dados guardados neste telemóvel e atualiza em segundo plano */
+    applyBoot(cached); render(); flush();
+    API.boot().then(async x => { await kv.set('boot', x); applyBoot(x); if (!document.querySelector('.ov, .staff') && S.view !== 'flow' && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) render(); })
+      .catch(e => { if (!e.auth) toast('Sem rede: a usar os dados guardados neste telemóvel.'); });
+  } else {
+    app.replaceChildren(h('div', { style: 'padding:40px 20px;text-align:center' }, h('b', {}, 'A abrir…')));
+    try { r = await API.boot(); if (IS_GS) await kv.set('boot', r); }
+    catch (e) { if (e.auth) return; app.replaceChildren(h('div', { style: 'padding:30px 20px' }, h('h1', {}, 'Não consegui abrir'), h('p', { class: 'mut' }, (e && e.message) || String(e)), h('p', { class: 'mut' }, 'Confirma que tens rede e tenta outra vez.'), h('button', { class: 'btn primary', onclick: () => location.reload() }, 'Tentar outra vez'))); return; }
+    applyBoot(r); render(); flush();
   }
-  applyBoot(r);
-  render(); flush();
   if (!listening) {
     listening = true;
     window.addEventListener('online', () => { chip(); flush(true); refreshData(true); }); window.addEventListener('offline', chip);
@@ -2432,7 +2474,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.35';
+const BUILD = 'v2.36';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
