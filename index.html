@@ -351,6 +351,8 @@ const API = {
   async proporAluno(a) { if (IS_GS) return gs('apiProporAluno', a); return { ok: true, demo: true, alteracao: { id: 'AL-demo-' + Date.now(), tipo: DEMO.alunos.some(z => z.id === a.id) ? 'editar' : 'novo', aluno_id: a.id, estado: 'pendente', criado_em: new Date().toISOString(), nome: a.nome, local_id: a.local_id } }; },
   async decidirAlteracao(id, ok) { if (IS_GS) return gs('apiDecidirAlteracao', id, ok); return { ok: true, demo: true }; },
   async decidirFotos(aulaId, pub, nao) { if (IS_GS) return gs('apiDecidirFotos', aulaId, pub, nao); return { ok: true, demo: true, decididas: (pub || []).length + (nao || []).length, restantes: 0 }; },
+  async fotoDados(id) { if (IS_GS) return gs('apiFotoDados', id); return { ok: true, dataUrl: '' }; },
+  async fotoBanner(id, d) { if (IS_GS) return gs('apiFotoBanner', id, d); return { ok: true, id, url: '' }; },
   async boot() {
     if (IS_GS) return gs('apiBootstrap');
     let db = await kv.get('demo', null); if (!db || !db.professores[0].valor_aula) { db = seedDemo(); await kv.set('demo', db); }
@@ -813,6 +815,21 @@ function viewPend() {
   return el;
 }
 /* N9: o gestor decide, foto a foto, o que se publica. As fotos ficam em Drive/Fotos/Por aprovar até decidir. */
+/* 2.35: as fotos enviadas antes de 15/11/2026 não têm banner. O gestor junta-o aqui: a foto é composta no browser e substitui a original no Drive. */
+async function aplicaBanner(a, fotos, bt) {
+  const loc = localById(a.local_id), proj = projById(a.projeto_id || (loc || {}).projeto_id);
+  if (!(await confirmBox('Aplicar banner', `Junta o banner de ${(loc || {}).nome || 'este local'} a ${fotos.length} foto(s). Usa só em fotos que foram enviadas sem banner. A foto original é substituída pela foto com banner.`, 'Aplicar'))) return;
+  bt.disabled = true; delete S.banners[a.local_id];
+  let bn = ''; try { bn = await bannerFor(loc, proj); } catch (e) { bn = ''; }
+  if (!bn) { toast('Este local não tem banner. Define-o em Gestão → Locais → Banners dos locais.'); bt.disabled = false; return; }
+  let ok = 0, erro = '';
+  for (const f of fotos) {
+    bt.textContent = `A aplicar ${ok + 1} de ${fotos.length}…`;
+    try { const d = await API.fotoDados(f.id); const u = await composite(d.dataUrl, bn); const r = await API.fotoBanner(f.id, u); f.id = r.id; f.url = r.url; f.com_banner = 'sim'; ok++; }
+    catch (e) { erro = e.server ? e.message : 'Sem ligação ao servidor.'; break; }
+  }
+  toast(erro ? `${ok} foto(s) com banner. Parou com um erro: ${erro}` : `Banner aplicado a ${ok} foto(s) ✓`); render();
+}
 function viewFotos() {
   const el = h('div'), list = S.d.fotosPend || [];
   el.append(h('p', { class: 'mut cap', style: 'margin-top:0' }, 'Fotos das aulas, ainda por decidir. Escolha o que pode ser publicado; o resto fica guardado em "Não publicadas". Se aparecerem crianças ou alunos sem consentimento, a sugestão é não publicar.'));
@@ -834,7 +851,9 @@ function viewFotos() {
       a.crianca ? h('div', { style: 'margin-top:6px' }, h('span', { class: 'chip warn' }, 'Crianças presentes · sugestão: não publicar')) : null,
       a.recusado ? h('div', { style: 'margin-top:6px' }, h('span', { class: 'chip bad' }, 'Há aluno que recusou fotografias · confirme antes de publicar')) : null,
       a.rgpd ? h('div', { style: 'margin-top:6px' }, h('span', { class: 'chip rgpd', style: 'white-space:normal' }, a.rgpd)) : null,
-      h('div', { style: 'margin-top:8px' }, ...rows), h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: guardar }, 'Guardar decisão')));
+      h('div', { style: 'margin-top:8px' }, ...rows),
+      (() => { const sb = a.fotos.filter(f => f.com_banner !== 'sim' && String(f.criado_em || '').slice(0, 10) < '2026-11-15'); return sb.length ? h('button', { class: 'btn ghost small', style: 'margin-top:10px', onclick: e => aplicaBanner(a, sb, e.currentTarget) }, `🖼️ Aplicar o banner do local a ${sb.length} foto(s) sem banner`) : h('div', { class: 'mut cap', style: 'margin-top:8px' }, '✓ Fotos com banner'); })(),
+      h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: guardar }, 'Guardar decisão')));
   });
   return el;
 }
@@ -2413,7 +2432,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.34';
+const BUILD = 'v2.35';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
