@@ -1975,9 +1975,23 @@ function viewGestao() {
     h('button', { class: 'btn primary', style: 'margin-bottom:14px', onclick: () => geForm(st.sec, null) }, '+ ' + spec.novo));
   const items = spec.items();
   if (!items.length) el.append(h('p', { class: 'mut' }, 'Ainda não há nada aqui.'));
-  items.forEach(it => el.append(h('div', { class: 'card row', style: spec.inactive && spec.inactive(it) ? 'opacity:.6' : '' },
+  const busca = st.busca = st.busca || {};
+  const norm = s => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  const cards = [];
+  const cnt = h('div', { class: 'mut cap', style: 'margin:-4px 0 10px' });
+  const nada = h('p', { class: 'mut', style: 'display:none' }, 'Nada encontrado.');
+  const filtra = () => {
+    const ws = norm(busca[st.sec]).split(/\s+/).filter(Boolean); let n = 0;
+    cards.forEach(c => { const ok = ws.every(w => c.k.includes(w)); c.el.style.display = ok ? '' : 'none'; if (ok) n++; });
+    nada.style.display = ws.length && !n ? '' : 'none';
+    cnt.textContent = ws.length ? n + ' de ' + items.length : '';
+  };
+  if (items.length > 5) el.append(h('input', { class: 'in', type: 'search', placeholder: 'Procurar em ' + spec.titulo.toLowerCase() + ' (nome, projeto…)', value: busca[st.sec] || '', style: 'margin-bottom:10px', oninput: e => { busca[st.sec] = e.target.value; filtra(); } }), cnt);
+  items.forEach(it => { const card = h('div', { class: 'card row', style: spec.inactive && spec.inactive(it) ? 'opacity:.6' : '' },
     h('div', { class: 'grow' }, h('b', {}, spec.nome(it)), h('div', { class: 'mut cap' }, spec.sub(it))),
-    h('button', { class: 'btn small ghost', onclick: () => geForm(st.sec, it) }, 'Editar'))));
+    h('button', { class: 'btn small ghost', onclick: () => geForm(st.sec, it) }, 'Editar'));
+    cards.push({ el: card, k: norm(spec.nome(it) + ' ' + spec.sub(it)) }); el.append(card); });
+  el.append(nada); filtra();
   el.append(h('p', { class: 'mut cap', style: 'margin-top:16px' }, 'Para retirar uma turma ou um professor, marca-o como inativo. Só se pode eliminar o que não tem nada associado (Editar → Eliminar).'));
   return el;
 }
@@ -2295,7 +2309,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.30';
+const BUILD = 'v2.31';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
