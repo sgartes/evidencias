@@ -414,6 +414,9 @@ const API = {
     return { ok: true, projetos: [] };
   },
   async calendarioHoras(projId) { if (IS_GS) return gs('apiCalendarioHoras', projId); return { ok: true, hoje: today(), projetos: [], calendario: [] }; },
+  async fotosPublicadas(projId, estado, off) { if (IS_GS) return gs('apiFotosPublicadas', projId, estado, off); return { ok: true, total: 0, fotos: [] }; },
+  async fotoThumbs(ids) { if (IS_GS) return gs('apiFotoThumbs', ids); return { ok: true, thumbs: {} }; },
+  async fotoMover(id, acao, projId) { if (IS_GS) return gs('apiFotoMover', id, acao, projId); return { ok: true }; },
   async calendarioSave(lista) { if (IS_GS) return gs('apiCalendarioSave', lista); return { ok: true }; },
   async calendarioDel(id) { if (IS_GS) return gs('apiCalendarioDel', id); return { ok: true }; },
   async coordSave(o) { if (IS_GS) return gs('apiCoordSave', o); return { ok: true }; },
@@ -558,7 +561,8 @@ const OPS = {
 async function sendAula(item, rec) {
   const p = item.payload; p.fotoUrls = p.fotoUrls || [];
   const base = `${p.data} ${(localById(p.localId) || {}).nome || ''}`;
-  while (p.fotos && p.fotos.length) { const u = await API.uploadFoto(p.idCliente, p.fotoUrls.length, p.fotos[0], base, p.localId); p.fotoUrls.push(u.url); p.fotos.shift(); await kv.set('queue', S.queue); }
+  const loc0 = localById(p.localId), proj0 = loc0 ? projById(loc0.projeto_id) : null;
+  while (p.fotos && p.fotos.length) { let d0 = p.fotos[0]; try { const bn0 = await bannerFor(loc0, proj0); if (bn0) d0 = await composite(d0, bn0); } catch (e) { d0 = p.fotos[0]; } const u = await API.uploadFoto(p.idCliente, p.fotoUrls.length, d0, base, p.localId); p.fotoUrls.push(u.url); p.fotos.shift(); await kv.set('queue', S.queue); }
   const r = await API.saveAula(p);
   if (rec) {
     rec.estado = 'enviada'; rec.aulaId = r.aulaId; rec.formUrl = r.formUrl || ''; rec.formErro = r.formErro || ''; rec.erro = ''; rec.aprovacao = r.aprovacao || '';
@@ -1578,6 +1582,8 @@ const GE = {
       { k: 'data_inicio', l: 'Início das aulas', type: 'date' }, { k: 'data_fim', l: 'Data limite de execução', type: 'date', help: 'Data limite do contrato. Aulas fora destas datas ficam a aguardar a tua aprovação.' },
       { k: 'horas_previstas', l: 'Total de horas previstas do projeto', help: 'Aulas + mostras + espetáculos (ex.: 150). Serve para as horas em falta e a previsão do fim. Vazio = sem total.' },
       { k: 'horas_coord', l: 'Horas de coordenação', help: 'Ex.: 42. São repartidas por igual pelas semanas com aulas no calendário de horas.' },
+      { k: 'pasta_fotos', l: 'Pasta de fotos publicadas (link do Drive)', help: 'As fotos chegam com banner e vão direto para esta pasta (a que o site lê). Partilha-a como Editor com a conta da app. Vazio = ficam por aprovar.' },
+      { k: 'pasta_retiradas', l: 'Pasta de fotos retiradas (opcional)', help: 'Para onde vão as fotos que retirares do ar. Vazio = pasta «Não publicadas» do Drive da app.' },
       { k: 'estado', l: 'Estado do projeto', type: 'select', opts: ESTADOS_PROJ, def: 'ativo', help: 'Só se podem eliminar dados pessoais de alunos quando todos os projetos que frequentaram estão Encerrados.' },
       { k: 'formulario_url', l: 'Link do formulário (https://…)', type: 'url' },
       { k: 'entidade_email', l: 'Email da entidade', type: 'email', help: 'Recebe um aviso quando um professor regista uma aula não prevista. Vazio = não envia nada.' },
@@ -1790,6 +1796,54 @@ function calendarioHorasModal(projId) {
   }
   load();
 }
+function fotosPublicadasModal(projId) {
+  const box = h('div', {}, h('p', { class: 'mut' }, 'A carregar…'));
+  openSheet('Fotos publicadas', box);
+  const st = { proj: projId || '', estado: 'publicada', off: 0 };
+  const projs = (S.d.projetos || []);
+  const dm = d => d ? String(d).split('-').reverse().join('/') : '';
+  const nomeP = id => ((projs.find(p => p.id === id)) || {}).nome || '';
+  const grid = h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin-top:10px' });
+  const info = h('p', { class: 'mut', style: 'margin:8px 0 0' });
+  const mais = h('button', { class: 'btn ghost', style: 'margin-top:10px;display:none', onclick: () => load(true) }, 'Ver mais');
+  const selP = h('select', { class: 'in', onchange: () => { st.proj = selP.value; load(false); } },
+    h('option', { value: '' }, 'Todos os projetos'), ...projs.map(p => h('option', { value: p.id }, p.nome)));
+  selP.value = st.proj;
+  const bPub = h('button', { class: 'btn', onclick: () => troca('publicada') }, 'Publicadas');
+  const bOff = h('button', { class: 'btn ghost', onclick: () => troca('nao_publicada') }, 'Retiradas');
+  function troca(e) { st.estado = e; bPub.className = 'btn' + (e === 'publicada' ? '' : ' ghost'); bOff.className = 'btn' + (e === 'publicada' ? ' ghost' : ''); load(false); }
+  box.replaceChildren(h('div', { style: 'display:flex;flex-wrap:wrap;gap:8px;align-items:center' }, selP, bPub, bOff), info, grid, mais);
+  function cartao(f) {
+    const img = h('img', { alt: 'Foto', style: 'width:100%;height:120px;object-fit:cover;border-radius:10px;background:#eee;display:block' });
+    const card = h('div', { style: 'border:1px solid var(--line,#ddd);border-radius:12px;padding:6px;background:#fff' }, img,
+      h('div', { class: 'mut', style: 'font-size:12px;margin:4px 0' }, dm(f.data) + ' · ' + (f.local || '') + (nomeP(f.projeto_id) ? ' · ' + nomeP(f.projeto_id) : '')));
+    const mover = async (acao, pid) => {
+      try { await API.fotoMover(f.id, acao, pid || ''); } catch (e) { toast(e.server ? e.message : 'Sem ligação.'); return; }
+      toast(acao === 'despublicar' ? 'Foto retirada do ar ✓' : 'Foto publicada ✓'); card.remove(); info.textContent = '';
+    };
+    if (st.estado === 'publicada') {
+      const sel = h('select', { class: 'in', style: 'margin:4px 0' }, ...projs.map(p => h('option', { value: p.id }, p.nome)));
+      sel.value = f.projeto_id;
+      card.append(h('button', { class: 'btn ghost', style: 'width:100%;margin-top:2px', onclick: () => mover('despublicar') }, 'Retirar do ar'),
+        h('details', {}, h('summary', { class: 'mut', style: 'font-size:12px;cursor:pointer;margin-top:4px' }, 'Mudar de pasta'), sel,
+          h('button', { class: 'btn ghost', style: 'width:100%', onclick: () => mover('publicar', sel.value) }, 'Mover para o projeto')));
+    } else card.append(h('button', { class: 'btn', style: 'width:100%;margin-top:2px', onclick: () => mover('publicar') }, 'Publicar de novo'));
+    card.append(h('a', { href: f.url, target: '_blank', rel: 'noopener', class: 'mut', style: 'font-size:12px;display:block;margin-top:4px' }, 'Abrir no Drive'));
+    return { card, img };
+  }
+  async function load(append) {
+    if (!append) { st.off = 0; grid.replaceChildren(); }
+    info.textContent = 'A carregar…'; mais.style.display = 'none';
+    let r; try { r = await API.fotosPublicadas(st.proj, st.estado, st.off); } catch (e) { info.textContent = e.server ? e.message : 'Sem ligação.'; return; }
+    const cs = r.fotos.map(cartao); cs.forEach(c => grid.append(c.card)); st.off += r.fotos.length;
+    info.textContent = r.total ? 'A mostrar ' + Math.min(st.off, r.total) + ' de ' + r.total + (st.estado === 'publicada' ? ' fotos publicadas (com banner).' : ' fotos retiradas.') : (st.estado === 'publicada' ? 'Ainda não há fotos publicadas.' : 'Não há fotos retiradas.');
+    mais.style.display = st.off < r.total ? '' : 'none';
+    for (let i = 0; i < r.fotos.length; i += 12) {
+      try { const t = await API.fotoThumbs(r.fotos.slice(i, i + 12).map(f => f.id)); r.fotos.slice(i, i + 12).forEach((f, k) => { const u = (t.thumbs || {})[f.id]; if (u) cs[i + k].img.src = u; }); } catch (e) { }
+    }
+  }
+  load(false);
+}
 function painelProjetosModal() {
   const lista = h('div', {}, h('p', { class: 'mut' }, 'A carregar…'));
   const s = openSheet('Painel por projeto', lista);
@@ -1917,6 +1971,7 @@ function viewGestao() {
     h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => wizardProjeto() }, '✦ Criar projeto passo a passo'),
     st.sec === 'projetos' ? h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => painelProjetosModal() }, '📊 Painel por projeto') : null,
     st.sec === 'projetos' ? h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => calendarioHorasModal('') }, '📅 Calendário de horas (todos)') : null,
+    st.sec === 'projetos' ? h('button', { class: 'btn ghost', style: 'margin-bottom:10px', onclick: () => fotosPublicadasModal('') }, '🖼️ Fotos publicadas') : null,
     h('button', { class: 'btn primary', style: 'margin-bottom:14px', onclick: () => geForm(st.sec, null) }, '+ ' + spec.novo));
   const items = spec.items();
   if (!items.length) el.append(h('p', { class: 'mut' }, 'Ainda não há nada aqui.'));
@@ -2077,7 +2132,7 @@ async function aulaModal(x, reload) {
     h('button', { class: 'btn primary', style: 'margin-top:16px', onclick: async () => {
       const patch = { inicio: timeIn.value || st.inicio, duracaoMin: Number(durIn.value) || st.dur, observacoes: obs.value.trim() };
       if (pres) patch.presencas = pres.map(p => ({ alunoId: p.alunoId, presente: !!p.presente })); else { patch.homens = st.h; patch.mulheres = st.m; }
-      if (gest) { patch.data = dateIn.value; patch.grupoId = grupoSel.value; patch.profId = profSel.value; patch.removerFotos = [...rem]; patch.novasFotos = novas; }
+      if (gest) { patch.data = dateIn.value; patch.grupoId = grupoSel.value; patch.profId = profSel.value; patch.removerFotos = [...rem]; patch.novasFotos = await Promise.all(novas.map(async d => { try { const lc = localById(x.local_id), bn = await bannerFor(lc, lc ? projById(lc.projeto_id) : null); return bn ? await composite(d, bn) : d; } catch (e) { return d; } })); }
       patch.tipoSessao = tipoSel.value; try { await API.editAula(x.id, patch); } catch (e) { toast(e.server ? e.message : 'Sem ligação. Corrigir aulas precisa de rede.'); return; }
       s.close(); toast('Aula corrigida ✓'); reload();
     } }, 'Guardar correção'),
@@ -2240,7 +2295,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.28';
+const BUILD = 'v2.29';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
