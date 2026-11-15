@@ -1622,10 +1622,26 @@ function geForm(sec, it, opt) {
 }
 /* ---------- 2.32: BANNER POR LOCAL ---------- */
 function bannersLocaisModal() {
-  const lista = h('div');
-  openSheet('Banners dos locais', h('p', { class: 'mut', style: 'margin-top:0' }, 'Cada local pode ter o seu banner. As fotos novas desse local saem sempre com o banner que estiver aqui. As fotos já publicadas mantêm o banner com que foram enviadas.'), lista);
-  const pn = l => (projById(l.projeto_id) || {}).nome || '';
-  S.d.locais.slice().sort((a, b) => pn(a).localeCompare(pn(b)) || String(a.nome).localeCompare(String(b.nome))).forEach(l => lista.append(bannerLocalCard(l)));
+  const lista = h('div'), pn = l => (projById(l.projeto_id) || {}).nome || '';
+  const enche = () => lista.replaceChildren(...S.d.locais.slice().sort((a, b) => pn(a).localeCompare(pn(b)) || String(a.nome).localeCompare(String(b.nome))).map(l => bannerLocalCard(l)));
+  const mig = h('button', { class: 'btn ghost', style: 'margin-bottom:12px', onclick: async ev => {
+    const bt = ev.currentTarget; if (bt.disabled) return; bt.disabled = true;
+    const alvo = S.d.locais.filter(l => !l.banner_file_id); let ok = 0, sem = 0, falhas = 0;
+    for (let i = 0; i < alvo.length; i++) {
+      const l = alvo[i]; bt.textContent = 'A copiar ' + (i + 1) + ' de ' + alvo.length + '…';
+      try {
+        const r = await fetch('banners/' + l.id + '.jpg'); if (!r.ok) { sem++; continue; }
+        const bl = await r.blob(); if (!/^image\//.test(bl.type)) { sem++; continue; }
+        const d = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(bl); });
+        const rr = await API.bannerLocalGuardar(l.id, d); l.banner_file_id = rr.fileId || ''; await kv.set('bl_' + rr.fileId, d); delete S.banners[l.id]; ok++;
+      } catch (e) { falhas++; }
+    }
+    bt.disabled = false; bt.textContent = '⬇️ Copiar banners do site para o Drive';
+    toast(ok + ' copiado(s)' + (sem ? ', ' + sem + ' sem banner no site' : '') + (falhas ? ', ' + falhas + ' com erro (tenta outra vez)' : '')); enche();
+  } }, '⬇️ Copiar banners do site para o Drive');
+  openSheet('Banners dos locais', h('p', { class: 'mut', style: 'margin-top:0' }, 'Cada local pode ter o seu banner. As fotos novas desse local saem sempre com o banner que estiver aqui. As fotos já publicadas mantêm o banner com que foram enviadas.'),
+    h('p', { class: 'mut cap' }, 'Os banners antigos estão no site, não no Drive. O botão copia-os para o Drive (SGArtes Aulas / Banners), só dos locais que ainda não têm banner próprio.'), mig, lista);
+  enche();
 }
 function prepBanner(file) {
   return new Promise((res, rej) => {
@@ -2358,7 +2374,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.32';
+const BUILD = 'v2.33';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
