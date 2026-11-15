@@ -564,10 +564,10 @@ async function sendAula(item, rec) {
   const p = item.payload; p.fotoUrls = p.fotoUrls || [];
   const base = `${p.data} ${(localById(p.localId) || {}).nome || ''}`;
   const loc0 = localById(p.localId), proj0 = loc0 ? projById(loc0.projeto_id) : null;
-  while (p.fotos && p.fotos.length) { let d0 = p.fotos[0]; try { const bn0 = await bannerFor(loc0, proj0); if (bn0) d0 = await composite(d0, bn0); } catch (e) { d0 = p.fotos[0]; } const u = await API.uploadFoto(p.idCliente, p.fotoUrls.length, d0, base, p.localId); p.fotoUrls.push(u.url); p.fotos.shift(); await kv.set('queue', S.queue); }
+  while (p.fotos && p.fotos.length) { let d0 = p.fotos[0]; try { const bn0 = await bannerFor(loc0, proj0); if (bn0) d0 = await composite(d0, bn0); else p.semBanner = true; } catch (e) { d0 = p.fotos[0]; p.semBanner = true; } const u = await API.uploadFoto(p.idCliente, p.fotoUrls.length, d0, base, p.localId); p.fotoUrls.push(u.url); p.fotos.shift(); await kv.set('queue', S.queue); }
   const r = await API.saveAula(p);
   if (rec) {
-    rec.estado = 'enviada'; rec.aulaId = r.aulaId; rec.formUrl = r.formUrl || ''; rec.formErro = r.formErro || ''; rec.erro = ''; rec.aprovacao = r.aprovacao || '';
+    rec.estado = 'enviada'; rec.aulaId = r.aulaId; rec.formUrl = r.formUrl || ''; rec.formErro = r.formErro || ''; rec.erro = ''; rec.aprovacao = r.aprovacao || ''; rec.fotosPorAprovar = Number(r.fotosPorAprovar) || 0; rec.fotosPublicadas = Number(r.fotosPublicadas) || 0; rec.semBanner = !!p.semBanner;
     const patch = {}; if (rec.form_estado === 'enviado') patch.form_estado = 'enviado'; if (rec.post_estado === 'publicado') patch.post_estado = 'publicado';
     if (Object.keys(patch).length) { try { await API.updateEstado(r.aulaId, patch); } catch (e) { } }
   }
@@ -637,7 +637,7 @@ function profileMenu() {
       await API.logout(); TOKEN = ''; await kv.del('token'); await kv.del('boot'); S.recent = S.recent.filter(r => r.estado !== 'enviada'); await saveRecent(); location.reload();
     } }, 'Sair') : null,
     !IS_GS ? h('button', { class: 'btn bad', style: 'margin-bottom:10px', onclick: async () => { if (await confirmBox('Reiniciar demonstração', 'Apaga as aulas e alunos de teste deste telemóvel.', 'Reiniciar')) { await API.reset(); location.reload(); } } }, 'Reiniciar a demonstração') : null,
-    h('p', { class: 'mut cap' }, `SGArtes · Aulas · ${VERSION}`));
+    h('p', { class: 'mut cap' }, `SGArtes · Aulas · ${BUILD}`));
 }
 function renderLogin(msg) {
   const app = $('#app'), err = h('p', { class: 'mut', style: 'color:var(--bad);min-height:20px' }, msg || ''), btn = h('div', { style: 'min-height:48px' });
@@ -833,6 +833,7 @@ function viewFotos() {
     el.append(h('div', { class: 'card' }, h('b', {}, `${l.nome || ''} · ${DIAS[dow(a.data)]} ${fmtShort(a.data)} · ${a.hora_inicio}`), h('div', { class: 'mut cap' }, `${(profById(a.prof_deu_id) || {}).nome || ''} · ${a.fotos.length} foto(s)`),
       a.crianca ? h('div', { style: 'margin-top:6px' }, h('span', { class: 'chip warn' }, 'Crianças presentes · sugestão: não publicar')) : null,
       a.recusado ? h('div', { style: 'margin-top:6px' }, h('span', { class: 'chip bad' }, 'Há aluno que recusou fotografias · confirme antes de publicar')) : null,
+      a.rgpd ? h('div', { style: 'margin-top:6px' }, h('span', { class: 'chip rgpd', style: 'white-space:normal' }, a.rgpd)) : null,
       h('div', { style: 'margin-top:8px' }, ...rows), h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: guardar }, 'Guardar decisão')));
   });
   return el;
@@ -993,8 +994,8 @@ function lateItems() {
 }
 function pendingSign() {
   const out = [], seen = new Set();
-  S.recent.forEach(r => { seen.add(r.idCliente); if (r.semAssin && r.estado !== 'anulada') out.push({ idCliente: r.idCliente, aulaId: r.aulaId, localId: r.localId, data: r.data, inicio: r.inicio, profId: r.profId || S.me.id }); });
-  S.d.aulas.forEach(a => { if (a.sem_assinatura && a.estado !== 'anulada' && !seen.has(a.id_cliente)) { seen.add(a.id_cliente); out.push({ idCliente: a.id_cliente, aulaId: a.id, localId: a.local_id, data: String(a.data), inicio: a.hora_inicio, profId: a.prof_deu_id, aula: a }); } });
+  S.recent.forEach(r => { seen.add(r.idCliente); if (r.semAssin && r.estado !== 'anulada') out.push({ idCliente: r.idCliente, aulaId: r.aulaId, localId: r.localId, data: r.data, inicio: r.inicio, profId: r.profId || S.me.id, homens: r.homens, mulheres: r.mulheres }); });
+  S.d.aulas.forEach(a => { if (a.sem_assinatura && a.estado !== 'anulada' && !seen.has(a.id_cliente)) { seen.add(a.id_cliente); out.push({ idCliente: a.id_cliente, aulaId: a.id, localId: a.local_id, data: String(a.data), inicio: a.hora_inicio, profId: a.prof_deu_id, homens: a.homens, mulheres: a.mulheres, aula: a }); } });
   return out.sort((a, b) => (a.data + a.inicio).localeCompare(b.data + b.inicio));
 }
 function signItems() { return pendingSign().filter(x => S.sigAll || !x.profId || x.profId === S.me.id); }
@@ -1137,13 +1138,13 @@ function deckUI(paint) {
   const troca = h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => { f.modo = f.modo === 'catalogo' ? 'cartoes' : 'catalogo'; paint(); } }, f.modo === 'catalogo' ? 'Mudar para cartões (deslizar)' : 'Mudar para catálogo de fotos'));
   if (f.modo === 'catalogo' && list.length) {
     const resto = list.filter(a => f.marks[a.id] === undefined).map(a => a.id);
-    wrap.append(h('div', { class: 'row-between' }, h('span', { class: 'chip' }, `${list.length - c.falta} de ${list.length}`), h('span', { class: 'chip ok' }, `${c.t} presentes · ${c.h} H · ${c.m} M`)),
+    wrap.append(h('div', { class: 'row-between' }, h('span', { class: 'chip' }, `${list.length - c.falta} de ${list.length}`), h('span', { class: 'chip ok' }, `${c.t} presentes · ${c.h} H · ${c.m} M`), rgpdChip(list)),
       h('p', { class: 'mut cap', style: 'margin:8px 0 0' }, 'Toca em quem chegou. No fim, marca os restantes como faltas.'),
       h('div', { style: 'display:grid;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:10px;margin-top:10px' }, ...list.map(a => {
         const v = f.marks[a.id];
         return h('button', { type: 'button', 'aria-pressed': v === true ? 'true' : 'false', style: `border:3px solid ${v === true ? 'var(--ok)' : v === false ? 'var(--bad-l)' : 'var(--line)'};background:${v === true ? 'var(--ok-l)' : '#fff'};border-radius:16px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);opacity:${v === false ? '.55' : '1'}`,
           onclick: () => { if (v === true) delete f.marks[a.id]; else { f.marks[a.id] = true; f.history.push(a.id); } paint(); } },
-          avatar(a), h('span', { style: 'text-align:center;line-height:1.2' }, a.nome.split(' ').filter(Boolean).slice(0, 2).join(' ')), v === true ? h('span', { class: 'chip ok' }, '✓ Veio') : v === false ? h('span', { class: 'chip bad' }, 'Faltou') : null);
+          avatar(a), h('span', { style: 'text-align:center;line-height:1.2' }, a.nome.split(' ').filter(Boolean).slice(0, 2).join(' ')), semRgpdA(a) ? h('span', { class: 'chip rgpd', style: 'font-size:11px;padding:2px 8px' }, 'RGPD por assinar') : null, v === true ? h('span', { class: 'chip ok' }, '✓ Veio') : v === false ? h('span', { class: 'chip bad' }, 'Faltou') : null);
       })),
       h('div', { class: 'tools', style: 'margin-top:12px;gap:8px;flex-wrap:wrap' },
         resto.length ? h('button', { class: 'btn ghost small', onclick: () => { resto.forEach(id => { f.marks[id] = false; }); f.history.push(resto); paint(); } }, `Os restantes ${resto.length} faltaram`) : null,
@@ -1151,7 +1152,7 @@ function deckUI(paint) {
       troca);
     return wrap;
   }
-  wrap.append(h('div', { class: 'row-between' }, h('span', { class: 'chip' }, `${list.length - c.falta} de ${list.length}`), h('span', { class: 'chip ok' }, `${c.t} presentes · ${c.h} H · ${c.m} M`)));
+  wrap.append(h('div', { class: 'row-between' }, h('span', { class: 'chip' }, `${list.length - c.falta} de ${list.length}`), h('span', { class: 'chip ok' }, `${c.t} presentes · ${c.h} H · ${c.m} M`), rgpdChip(list)));
   let busy = false;
   const decide = (val, card) => {
     if (busy || !cur) return; busy = true;
@@ -1168,7 +1169,7 @@ function deckUI(paint) {
       res.replaceChildren(...(q.length < 2 ? [] : list.filter(a => f.marks[a.id] === undefined && a.nome.toLowerCase().includes(q)).slice(0, 6).map(a => h('button', { class: 'namechip', onclick: () => { f.marks[a.id] = true; f.history.push(a.id); f.q = ''; paint(); } }, '✓ ' + a.nome))));
     };
     paintRes(); wrap.append(qIn, res);
-    const card = h('div', { class: 'sw', 'data-dir': '' }, avatar(cur, true), h('div', { class: 'nm' }, cur.nome), h('div', { class: 'hint' }, '‹ desliza: faltou · veio: desliza ›'));
+    const card = h('div', { class: 'sw', 'data-dir': '' }, avatar(cur, true), h('div', { class: 'nm' }, cur.nome), semRgpdA(cur) ? h('span', { class: 'chip rgpd' }, 'RGPD por assinar') : null, h('div', { class: 'hint' }, '‹ desliza: faltou · veio: desliza ›'));
     attachSwipe(card, v => decide(v, card));
     wrap.append(h('div', { class: 'deck' }, card),
       h('div', { class: 'decide' }, h('button', { class: 'btn bad', onclick: () => decide(false, card) }, '✗ Faltou'), h('button', { class: 'btn ok', onclick: () => decide(true, card) }, '✓ Veio')));
@@ -1193,6 +1194,9 @@ function deckUI(paint) {
     } }, 'Só quero contar (sem nomes)')));
   return wrap;
 }
+/* 2.34: quantos alunos desta turma ainda não têm consentimento RGPD */
+const semRgpdA = a => !RGPD_OK.includes(a.rgpd_estado) && a.rgpd_estado !== 'recusado';
+function rgpdChip(list) { const n = (list || []).filter(semRgpdA).length; return n ? h('span', { class: 'chip rgpd', title: 'Alunos desta turma sem consentimento RGPD' }, `🔏 ${n} sem RGPD`) : null; }
 function attachSwipe(card, onDecide) {
   let x0 = null, dx = 0;
   card.addEventListener('pointerdown', e => { x0 = e.clientX; dx = 0; card.setPointerCapture(e.pointerId); card.style.transition = 'none'; });
@@ -1226,13 +1230,13 @@ function alunoModal(a, opt) {
   const nome = h('input', { class: 'in', placeholder: 'Nome completo', value: d.nome, autocomplete: 'off' });
   const seg = h('div', { class: 'seg' }, ...[['M', 'Mulher'], ['H', 'Homem']].map(([v, l]) => h('button', { type: 'button', class: genero === v ? 'on' : '', onclick: e => { genero = v; [...seg.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); } }, l)));
   const av = h('div', { style: 'display:flex;align-items:center;gap:14px' });
-  const paintAv = () => av.replaceChildren(avatar({ nome: nome.value || '?', foto_mini: crianca ? '' : foto }), crianca ? h('span', { class: 'mut cap' }, 'Menor: sem fotografia individual') : h('button', { class: 'btn ghost small', type: 'button', onclick: () => file.click() }, foto ? 'Mudar foto' : '📷 Foto (opcional)'));
+  const paintAv = () => av.replaceChildren(avatar({ nome: nome.value || '?', foto_mini: crianca ? '' : foto }), crianca ? h('span', { class: 'mut cap' }, 'Menor: sem fotografia individual') : h('div', { style: 'display:flex;gap:8px;flex-wrap:wrap' }, h('button', { class: 'btn ghost small', type: 'button', onclick: () => file.click() }, foto ? '📷 Tirar outra' : '📷 Tirar foto'), h('button', { class: 'btn ghost small', type: 'button', onclick: () => fileG.click() }, '🖼️ Da galeria')));
   const rgpdBox = h('div', { class: 'card', style: 'margin-top:14px' });
   let rgpdModo = d.rgpd_estado === 'recusado' ? 'recusado' : d.rgpd_estado === 'pendente' ? 'depois' : 'agora', rgpdConf = false;
   const paintRgpd = () => {
     if (RGPD_OK.includes(d.rgpd_estado)) { rgpdBox.replaceChildren(h('div', { class: 'row-between' }, h('b', {}, 'Consentimento RGPD'), h('span', { class: 'chip ok' }, (d.rgpd_estado === 'testemunhado' ? '✓ Confirmado por testemunha' : '✓ Assinado') + (d.rgpd_data ? ' ' + fmtShort(d.rgpd_data) : '')))); return; }
     rgpdSig = null;
-    const segM = h('div', { class: 'seg', style: 'flex-wrap:wrap;margin-top:8px' }, ...[['agora', 'Assina agora'], ['testemunha', 'Não sabe assinar'], ['recusado', 'Recusa'], ['depois', 'Fica para depois']].map(([v, l]) => h('button', { type: 'button', class: rgpdModo === v ? 'on' : '', onclick: () => { rgpdModo = v; paintRgpd(); } }, l)));
+    const segM = h('div', { class: 'seg', style: 'flex-wrap:wrap;margin-top:8px' }, ...[['agora', 'Assina agora'], ['testemunha', 'Não sabe assinar'], ['papel', 'Assinou em papel'], ['recusado', 'Recusa'], ['depois', 'Fica para depois']].map(([v, l]) => h('button', { type: 'button', class: rgpdModo === v ? 'on' : '', onclick: () => { rgpdModo = v; paintRgpd(); } }, l)));
     const kids = [h('div', { class: 'row-between' }, h('b', {}, 'Consentimento RGPD'), d.rgpd_estado === 'recusado' ? h('span', { class: 'chip bad' }, 'Recusou') : h('span', { class: 'chip rgpd' }, 'Por assinar')), segM];
     if (rgpdModo === 'agora' || rgpdModo === 'testemunha') {
       const pad = makePad(null, x => { rgpdSig = x; });
@@ -1240,11 +1244,18 @@ function alunoModal(a, opt) {
       if (rgpdModo === 'testemunha') kids.push(h('div', { class: 'check' + (rgpdConf ? ' on' : ''), role: 'checkbox', 'aria-checked': rgpdConf ? 'true' : 'false', style: 'display:flex;gap:10px;align-items:flex-start;margin:8px 0;cursor:pointer', onclick: () => { rgpdConf = !rgpdConf; paintRgpd(); } }, h('span', { class: 'box' }, rgpdConf ? '✓' : ''), h('span', { class: 'cap' }, 'Li este texto ao aluno, que não sabe assinar, e confirmo como testemunha que ele aceita o consentimento.')));
       kids.push(pad.el, h('div', { class: 'tools' }, h('button', { class: 'link', type: 'button', onclick: () => pad.clear() }, 'Limpar')),
         h('p', { class: 'mut cap', style: 'margin:0' }, rgpdModo === 'testemunha' ? 'Assinatura da testemunha (quem está a registar: funcionário ou professor).' : crianca ? 'Assinatura do encarregado de educação.' : 'Assinatura do aluno.'));
+    } else if (rgpdModo === 'papel') {
+      const prevP = h('div', { style: 'margin-top:8px' }, h('p', { class: 'mut cap', style: 'margin:0' }, 'Ainda sem fotografia do documento.'));
+      const inpP = h('input', { type: 'file', accept: 'image/*', hidden: true, onchange: async e => { const fl = e.target.files[0]; e.target.value = ''; if (!fl) return; try { rgpdSig = await shrink(fl, 1600, .8); prevP.replaceChildren(h('img', { src: rgpdSig, alt: 'Consentimento assinado em papel', style: 'width:100%;max-height:240px;object-fit:contain;border-radius:10px;background:#fff' })); } catch (err) { toast(err.message); } } });
+      kids.push(h('p', { class: 'cap', style: 'margin:8px 0' }, 'O consentimento foi assinado em papel. Fotografa o documento assinado (ou escolhe a digitalização). Fica guardado como prova e o aluno passa a ter o RGPD assinado.'),
+        h('button', { class: 'btn ghost small', type: 'button', onclick: () => inpP.click() }, '📄 Fotografar ou escolher o documento'), inpP, prevP);
     } else if (rgpdModo === 'recusado') kids.push(h('p', { class: 'cap', style: 'margin:8px 0' }, 'O aluno frequenta as aulas normalmente, mas não pode aparecer em fotografias. A app não volta a perguntar; pode mudar-se aqui mais tarde.'));
     else kids.push(h('p', { class: 'cap', style: 'margin:8px 0' }, 'Fica pendente e pode ser assinado mais tarde, na aula, junto do professor ou do funcionário. Até lá não aparece em fotografias.'));
     rgpdBox.replaceChildren(...kids);
   };
-  const file = h('input', { type: 'file', accept: 'image/*', capture: 'user', hidden: true, onchange: async e => { if (e.target.files[0]) { try { foto = await squareThumb(e.target.files[0], 160); paintAv(); } catch (err) { toast(err.message); } } } });
+  const pickFoto = async e => { if (e.target.files[0]) { try { foto = await squareThumb(e.target.files[0], 160); paintAv(); } catch (err) { toast(err.message); } } e.target.value = ''; };
+  const file = h('input', { type: 'file', accept: 'image/*', capture: 'user', hidden: true, onchange: pickFoto });
+  const fileG = h('input', { type: 'file', accept: 'image/*', hidden: true, onchange: pickFoto });
   paintAv(); paintRgpd();
   const kidSeg = h('div', { class: 'seg' }, ...[['nao', 'Adulto'], ['sim', 'Criança (menor)']].map(([v, l]) => h('button', { type: 'button', class: (crianca ? 'sim' : 'nao') === v ? 'on' : '', onclick: e => { crianca = v === 'sim'; [...kidSeg.children].forEach(b => b.classList.remove('on')); e.currentTarget.classList.add('on'); paintAv(); if (!RGPD_OK.includes(d.rgpd_estado)) paintRgpd(); } }, l)));
   const localSel = localPick(); localSel.value = d.local_id || (S.d.locais[0] || {}).id;
@@ -1268,7 +1279,7 @@ function alunoModal(a, opt) {
           : h('p', { class: 'mut', style: 'margin:6px 0 0' }, 'Ainda sem registos de presença.'));
     }).catch(() => histBox.replaceChildren(h('span', { class: 'mut' }, 'Não consegui carregar as presenças (sem ligação).')));
   }
-  const s = openSheet(a ? 'Aluno' : 'Novo aluno', av, file, a ? histBox : null, isFunc() ? h('p', { class: 'cap', style: 'margin:0 0 8px' }, 'Isto fica como pedido: só passa a valer depois de o gestor aprovar.') : null,
+  const s = openSheet(a ? 'Aluno' : 'Novo aluno', av, file, fileG, crianca ? null : h('p', { class: 'mut cap', style: 'margin:6px 0 0' }, 'A foto individual só fica guardada com o consentimento RGPD registado.'), a ? histBox : null, isFunc() ? h('p', { class: 'cap', style: 'margin:0 0 8px' }, 'Isto fica como pedido: só passa a valer depois de o gestor aprovar.') : null,
     h('label', { class: 'l' }, 'Nome completo'), nome, h('label', { class: 'l' }, 'Género (conta para os totais)'), seg, h('label', { class: 'l' }, 'Idade'), kidSeg,
     opt.fixed ? null : [h('label', { class: 'l' }, 'Local'), localSel, h('label', { class: 'l' }, 'Grupo'), grupoSel],
     seeData ? h('details', { style: 'margin-top:14px' }, h('summary', { style: 'font-weight:700;padding:8px 0' }, 'Contacto e data de nascimento (podem ficar para depois)'), h('label', { class: 'l' }, 'Contacto'), contacto, h('label', { class: 'l' }, 'Data de nascimento'), nasc, a ? null : h('p', { class: 'mut cap' }, 'Depois de guardados, só o gestor os vê. O professor recebe apenas o aviso de aniversário.')) : null,
@@ -1283,7 +1294,8 @@ function alunoModal(a, opt) {
       if (nasc.value && /^\d{4}-\d\d-\d\d$/.test(nasc.value)) out.aniv = nasc.value.slice(5);
       if (!RGPD_OK.includes(d.rgpd_estado)) {
         if (rgpdModo === 'testemunha' && rgpdSig && !rgpdConf) { toast('Confirma que és testemunha do consentimento.'); return; }
-        if ((rgpdModo === 'agora' || rgpdModo === 'testemunha') && rgpdSig) { out.rgpdAssinatura = rgpdSig; out.rgpdModo = rgpdModo; out.rgpd_estado = rgpdModo === 'testemunha' ? 'testemunhado' : 'assinado'; out.rgpd_data = today(); }
+        if (rgpdModo === 'papel' && !rgpdSig) { toast('Falta a fotografia do documento assinado.'); return; }
+        if ((rgpdModo === 'agora' || rgpdModo === 'testemunha' || rgpdModo === 'papel') && rgpdSig) { out.rgpdAssinatura = rgpdSig; out.rgpdModo = rgpdModo; out.rgpd_estado = rgpdModo === 'testemunha' ? 'testemunhado' : 'assinado'; out.rgpd_data = today(); }
         else out.rgpd_estado = rgpdModo === 'recusado' ? 'recusado' : 'pendente';
       }
       if (!RGPD_OK.includes(out.rgpd_estado)) out.foto_mini = '';
@@ -1324,7 +1336,7 @@ function stepFoto() {
         f.rgpdFora[a.id] ? h('span', { class: 'chip rgpd' }, 'Fica fora da foto') : f.rgpdRisco[a.id] ? h('span', { class: 'chip rgpd' }, 'Avança sem consentimento (risco do professor)') : [h('button', { class: 'btn ghost small', onclick: () => assinar(a) }, 'Assina agora'), h('button', { class: 'btn ghost small', onclick: () => marcaFora(a) }, 'Fica fora da foto'), h('button', { class: 'btn ghost small', onclick: () => avancaRisco(a) }, 'Avançar mesmo assim')]))) : null;
     const avisoRecusa = recus.length ? h('div', { class: 'card', style: 'border:2px solid var(--rgpd);margin-bottom:14px' }, h('b', { style: 'color:var(--rgpd)' }, 'Não aceitaram RGPD: ' + recus.map(a => a.nome).join(', ')), h('label', { style: 'display:flex;gap:10px;align-items:flex-start;margin-top:8px' }, h('input', { type: 'checkbox', checked: !!f.rgpdConf, style: 'width:24px;height:24px;flex:none', onchange: e => { f.rgpdConf = e.target.checked; paint(); } }), h('span', {}, 'Confirmo que ' + recus.map(a => a.nome).join(', ') + (recus.length > 1 ? ' não aparecem' : ' não aparece') + ' na foto'))) : null;
     const prev = h('div', { style: 'margin:4px 0 12px' });
-    if (f.fotos.length) (async () => { try { const bn = await bannerFor(f.local, f.proj); if (!bn) return; const u = await composite(f.fotos[0].dataUrl, bn); prev.replaceChildren(h('p', { class: 'mut cap', style: 'margin:0 0 6px' }, 'Assim vai o post, com o banner do local:'), h('img', { src: u, alt: 'Post com banner', style: 'width:100%;border-radius:12px;display:block' })); } catch (e) { } })();
+    if (f.fotos.length) (async () => { try { const bn = await bannerFor(f.local, f.proj); if (!bn) { prev.replaceChildren(h('div', { class: 'hintline' }, '⚠️ Não há banner para este local (ou não consegui carregá-lo). A foto segue sem banner. Avisa o gestor.')); return; } const u = await composite(f.fotos[0].dataUrl, bn); prev.replaceChildren(h('p', { class: 'mut cap', style: 'margin:0 0 6px' }, 'Assim vai o post, com o banner do local:'), h('img', { src: u, alt: 'Post com banner', style: 'width:100%;border-radius:12px;display:block' })); } catch (e) { prev.replaceChildren(h('div', { class: 'hintline' }, '⚠️ Não consegui juntar o banner à foto. Ela segue sem banner.')); } })();
     box.replaceChildren(avisoRgpd, avisoRecusa,
       h('button', { class: 'btn shot', onclick: () => cam.click() }, h('span', { style: 'font-size:38px' }, '📷'), f.fotos.length ? 'Tirar outra foto' : 'Tirar foto de grupo'),
       h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => gal.click() }, 'Escolher da galeria')), cam, gal,
@@ -1350,7 +1362,7 @@ function staffScreen() {
   const pad = makePad(null, d => { data = d; });
   const ov = h('div', { class: 'staff' }, h('div', { class: 'staff-in' },
     h('img', { src: LOGO, alt: 'SGArtes', style: 'height:44px' }), h('h1', { style: 'margin-top:14px' }, 'Confirmação da aula'),
-    h('p', { class: 'mut', style: 'font-size:17px' }, `${f.local.nome} · ${fmtShort(f.data)} · ${f.inicio} · ${counts().t} participantes`),
+    h('p', { class: 'mut', style: 'font-size:17px' }, `${f.local.nome} · ${fmtShort(f.data)} · ${f.inicio} · ${counts().t} participantes`), staffAtras(f),
     h('label', { class: 'l', style: 'font-size:17px' }, 'Nome do responsável do espaço'), nameIn,
     h('label', { class: 'l', style: 'font-size:17px' }, 'Assinatura'), pad.el, h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => pad.clear() }, 'Limpar')),
     h('button', { class: 'btn ok', style: 'margin-top:12px;min-height:62px;font-size:18px', onclick: () => {
@@ -1359,6 +1371,24 @@ function staffScreen() {
     } }, 'Concluído — devolver ao professor'),
     h('button', { class: 'btn ghost', style: 'margin-top:10px', onclick: () => ov.remove() }, 'Cancelar')));
   document.body.append(ov);
+}
+/* 2.34: aulas anteriores deste local ainda sem assinatura do funcionário. A assinatura de hoje vale também para as marcadas. */
+function atrasLista(f) { return pendingSign().filter(x => x.localId === f.local.id); }
+function atrasCard(f) {
+  const atras = atrasLista(f); if (!atras.length) return null;
+  if (!f.atrasSel) f.atrasSel = new Set(atras.map(x => x.idCliente));
+  const n = atras.filter(x => f.atrasSel.has(x.idCliente)).length;
+  return h('div', { class: 'card', style: 'margin-top:12px;border:2px solid var(--warn)' },
+    h('b', {}, `✍️ Há ${atras.length} aula(s) anteriores por assinar neste local`),
+    h('p', { class: 'mut cap', style: 'margin:4px 0 8px' }, `Pergunta ao funcionário se pode assinar também estas aulas. A mesma assinatura vale para as ${n} marcadas.`),
+    ...atras.map(x => h('button', { type: 'button', class: 'row', style: 'width:100%;background:none;border:0;text-align:left;border-bottom:1px solid var(--line);padding:8px 0', onclick: () => { if (f.atrasSel.has(x.idCliente)) f.atrasSel.delete(x.idCliente); else f.atrasSel.add(x.idCliente); go(); } },
+      h('span', { style: 'font-size:20px' }, f.atrasSel.has(x.idCliente) ? '☑️' : '⬜'),
+      h('div', { class: 'grow' }, h('b', {}, `${DIAS[dow(x.data)]} ${fmtShort(x.data)} · ${x.inicio}`), h('div', { class: 'mut cap' }, `${Number(x.homens) || 0} homens · ${Number(x.mulheres) || 0} mulheres · ${(profById(x.profId) || {}).nome || ''}`)))));
+}
+function staffAtras(f) {
+  const sel = atrasLista(f).filter(x => f.atrasSel && f.atrasSel.has(x.idCliente)); if (!sel.length) return null;
+  return h('div', { class: 'card', style: 'margin-top:8px' }, h('b', {}, `A sua assinatura confirma também ${sel.length} aula(s) anterior(es):`),
+    ...sel.map(x => h('div', { class: 'mut', style: 'font-size:16px;padding:4px 0' }, `${DIAS[dow(x.data)]} ${fmtShort(x.data)} · ${x.inicio} · ${Number(x.homens) || 0} homens · ${Number(x.mulheres) || 0} mulheres`)));
 }
 /* passo 3: assinatura e concluir */
 function previousNames() {
@@ -1402,6 +1432,7 @@ function stepAssin() {
         h('button', { class: 'btn ghost', style: 'margin-top:12px', onclick: staffScreen }, '📱 Entregar o telemóvel ao funcionário'),
         h('div', { style: 'height:12px' }), padR.el,
         h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => padR.clear() }, 'Limpar assinatura')),
+        atrasCard(f),
         h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => { f.later = true; go(); } }, 'O funcionário assina mais tarde'))]);
   if (!needP) {
     box.append(h('h2', {}, 'A tua assinatura'), h('div', { class: 'seg', style: 'margin-bottom:10px' },
@@ -1419,25 +1450,31 @@ async function finish() {
   const f = S.flow; if (f.saving) return;
   const fora = (f.proj.data_inicio && f.data < f.proj.data_inicio) || (f.proj.data_fim && f.data > f.proj.data_fim);
   if (fora && !(await confirmBox('Fora do período do projeto', `Esta data está fora do período do projeto (${f.proj.data_inicio ? fmtShort(f.proj.data_inicio) : '…'} a ${f.proj.data_fim ? fmtShort(f.proj.data_fim) : '…'}). A aula fica registada, mas só conta nas folhas e nos pagamentos depois de o gestor aprovar.`, 'Enviar para aprovação'))) return;
-  let semPost = false;
-  if (f.lista && f.proj.post_publico !== 'nao') {
-    const sem = f.order.map(alunoById).filter(a => a && f.marks[a.id] === true && !RGPD_OK.includes(a.rgpd_estado) && a.rgpd_estado !== 'recusado' && !(f.rgpdFora || {})[a.id]);
-    if (sem.length) semPost = !(await confirmBox('Sem consentimento RGPD', `${sem.map(a => a.nome).join(', ')} ${sem.length > 1 ? 'ainda não assinaram' : 'ainda não assinou'} o consentimento. Não há autorização formal para publicar. O formulário de evidências segue na mesma. Queres publicar a foto no Instagram?`, 'Publicar na mesma', 'Não publicar'));
-  }
+  const semPost = false;
+  /* 2.34 (C1): quem não assinou o RGPD não impede o envio. As fotos ficam a aguardar a aprovação de um gestor. */
+  const semRgpd = f.lista ? f.order.map(alunoById).filter(a => a && f.marks[a.id] === true && !RGPD_OK.includes(a.rgpd_estado) && a.rgpd_estado !== 'recusado' && !(f.rgpdFora || {})[a.id]) : [];
+  if (semRgpd.length && f.fotos.length && !(await confirmBox('Fotos a aguardar aprovação', `${semRgpd.map(a => a.nome).join(', ')} ${semRgpd.length > 1 ? 'estão presentes e ainda não assinaram' : 'está presente e ainda não assinou'} o consentimento RGPD. A aula e as fotos seguem na mesma, mas as fotos só aparecem no site depois de um gestor as aprovar. Podes publicar no Instagram, por tua conta e risco.`, 'Enviar', 'Voltar'))) return;
   f.saving = true;
   const c = counts(), idc = uid(), needP = !S.me.assinatura;
   const payload = {
     idCliente: idc, grupoId: f.g.id, localId: f.local.id, data: f.data, inicio: f.inicio, fim: fromMin(toMin(f.inicio) + f.dur), duracaoMin: f.dur,
     profDeuId: S.me.id, profPrevistoId: f.g.professor_id, substituicao: f.subst ? 'sim' : 'nao', homens: c.h, mulheres: c.m,
     presencas: f.lista ? f.order.map(id => ({ alunoId: id, presente: f.marks[id] === true })) : [], novosAlunos: f.novos, listaGrupo: f.lista ? 'sim' : 'nao',
-    observacoes: f.obs.trim(), fotos: f.fotos.map(p => p.dataUrl), assinaturaResp: f.later ? null : f.assinR, nomeResp: f.later ? '' : f.resp.trim(), assinaturaProf: (needP || f.modoP === 'nova') ? f.assinP : null, gps: f.gps, tipoSessao: f.tipo || 'aula', semPost
+    observacoes: f.obs.trim(), fotos: f.fotos.map(p => p.dataUrl), assinaturaResp: f.later ? null : f.assinR, nomeResp: f.later ? '' : f.resp.trim(), assinaturaProf: (needP || f.modoP === 'nova') ? f.assinP : null, gps: f.gps, tipoSessao: f.tipo || 'aula', semPost, rgpdFora: Object.keys(f.rgpdFora || {}).filter(k => f.rgpdFora[k])
   };
   // atualiza já o que a app sabe localmente
   f.novos.forEach(n => { if (!S.d.alunos.some(a => a.id === n.id)) S.d.alunos.push(n); });
   if (f.lista) f.order.forEach(id => { const a = alunoById(id); if (a && f.marks[id] === true && !a.grupo_id) a.grupo_id = f.g.id; });
   f.g.com_lista = payload.listaGrupo; if ((needP || f.modoP === 'nova') && f.assinP) S.me.assinatura = f.assinP;
   const rec = { idCliente: idc, aulaId: null, estado: 'por_enviar', erro: '', grupoId: f.g.id, localId: f.local.id, projetoId: f.proj.id, data: f.data, inicio: f.inicio, fim: payload.fim, dur: f.dur, homens: c.h, mulheres: c.m, nomeResp: payload.nomeResp, semAssin: !payload.assinaturaResp, profId: S.me.id,
-    form_estado: 'pendente', post_estado: f.proj.post_publico === 'nao' ? 'na' : semPost ? 'nao_publicar' : 'pendente', formUrl: '', formErro: '', fotosLocal: payload.fotos.slice(), rgpd: f.rgpdSnap || null, aprovacao: fora ? 'pendente' : '' };
+    form_estado: 'pendente', post_estado: f.proj.post_publico === 'nao' ? 'na' : semPost ? 'nao_publicar' : 'pendente', formUrl: '', formErro: '', fotosLocal: payload.fotos.slice(), rgpd: f.rgpdSnap || null, fotoRgpd: semRgpd.map(a => a.nome), nFotos: payload.fotos.length, aprovacao: fora ? 'pendente' : '' };
+  const atrasSel = (f.atrasSel && !f.later && f.assinR) ? pendingSign().filter(x => x.localId === f.local.id && f.atrasSel.has(x.idCliente)) : [];
+  if (atrasSel.length) {
+    const nomeR = f.resp.trim(), apiIds = [];
+    atrasSel.forEach(x => { const q = S.queue.find(z => z.idCliente === x.idCliente && (!z.kind || z.kind === 'aula')); if (q) { q.payload.assinaturaResp = f.assinR; q.payload.nomeResp = nomeR; } else if (x.aulaId) apiIds.push(x.aulaId);
+      const r = S.recent.find(z => z.idCliente === x.idCliente); if (r) { r.semAssin = false; r.nomeResp = nomeR; } if (x.aula) { x.aula.sem_assinatura = false; x.aula.nome_resp = nomeR; } });
+    if (apiIds.length) S.queue.push({ idCliente: uid(), kind: 'sign', payload: { ids: apiIds, nome: nomeR, data: f.assinR } });
+  }
   S.recent.unshift(rec); S.queue.push({ idCliente: idc, payload });
   await kv.set('queue', S.queue); await saveRecent();
   S.flow = null; S.doneId = idc; go('done'); flush(true);
@@ -1458,6 +1495,8 @@ function viewDone() {
     h('div', { style: 'text-align:center;margin-bottom:16px' }, sent ? h('span', { class: 'chip ok' }, IS_GS ? 'Enviada para a Sheet ✓' : 'Guardada neste telemóvel ✓') : rec.estado === 'erro' ? h('span', { class: 'chip bad' }, 'Erro: ' + rec.erro) : h('span', { class: 'chip warn' }, 'Por enviar — segue sozinha quando houver rede')));
   if (rec.estado === 'erro') el.append(h('button', { class: 'btn bad', style: 'margin-bottom:12px', onclick: () => flush(true) }, 'Tentar enviar outra vez'));
   if (rec.aprovacao === 'pendente') el.append(h('div', { class: 'hintline' }, 'Fora do período do projeto: a aguardar aprovação do gestor.'));
+  if (sent && rec.nFotos && rec.fotosPorAprovar !== undefined) el.append(rec.fotosPorAprovar ? h('div', { class: 'hintline' }, `📷 ${rec.fotosPorAprovar} foto(s) a aguardar a aprovação de um gestor antes de aparecerem no site` + ((rec.fotoRgpd || []).length ? ` (sem RGPD: ${rec.fotoRgpd.join(', ')}).` : '.')) : h('div', { class: 'card', style: 'text-align:center' }, `📷 ${rec.fotosPublicadas} foto(s) publicada(s) no site ✓`));
+  if (rec.semBanner) el.append(h('div', { class: 'hintline' }, 'Atenção: as fotos seguiram sem banner, porque o banner do local não carregou. Avisa o gestor.'));
   // formulário
   const fc = h('div', { class: 'card' }, h('b', { style: 'font-size:16.5px' }, '1. Formulário de evidências'));
   if (rec.form_estado === 'enviado') fc.append(h('div', { style: 'margin-top:8px' }, h('span', { class: 'chip ok' }, 'Formulário enviado ✓')));
@@ -1491,7 +1530,7 @@ async function bannerFor(loc, proj) {
   if (!b && key) b = (await kv.get('banner2_' + key)) || '';
   if (!b && key) { try { const r = await fetch('banners/' + key + '.jpg'); if (r.ok) { const bl = await r.blob(); b = await new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.onerror = rej; fr.readAsDataURL(bl); }); if (b) await kv.set('banner2_' + key, b); } } catch (e) { b = ''; } }
   if (!b && proj && proj.tem_banner) { try { b = (await API.banner(proj.id)).banner || ''; } catch (e) { b = ''; } }
-  S.banners[key] = b || ''; return S.banners[key];
+  if (b || navigator.onLine) S.banners[key] = b || ''; return b || '';
 }
 async function composite(photo, banner) {
   const load = u => new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = u; });
@@ -2254,7 +2293,7 @@ function sheetHtml(c) {
   const O = '#F1592A', mes = `${MESES[Number(c.ym.slice(5, 7)) - 1].toUpperCase()} - ${c.ym.slice(0, 4)}`;
   const th = (t, x) => `<th style="-webkit-print-color-adjust:exact;print-color-adjust:exact;background:${O};color:#fff;border:1px solid #000;padding:3px 4px;font-size:10px;font-weight:700;${x || ''}">${t}</th>`;
   const td = (t, x) => `<td style="border:1px solid #000;padding:2px 4px;font-size:11px;text-align:center;vertical-align:middle;${x || ''}">${t}</td>`;
-  const img = u => u ? `<img src="${u}" style="height:30px;max-width:110px">` : '';
+  const img = u => /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/=]+$/.test(String(u || '')) ? `<img src="${u}" style="height:30px;max-width:110px">` : ''; // 2.34 (C2): só imagens PNG/JPEG
   const entries = c.aulas.map(a => {
     const p = profById(a.prof_deu_id), hh = Number(a.homens), mm = Number(a.mulheres);
     return { k: a.data + a.hora_inicio, h: `<tr style="height:42px">${td(esc(c.loc.nome))}${td(fmtShort(a.data))}${td(esc(p ? p.nome : ''))}${td(esc(a.hora_inicio))}${td(esc(a.hora_fim))}${td(durTxt(a.duracao_min))}${td(hh)}${td(mm)}${td(hh + mm)}${td(img(a.assinaturaProf || c.profAssin[a.prof_deu_id]))}${td(img(a.assinaturaResp) + (a.nome_resp ? `<div style="font-size:8px">${esc(a.nome_resp)}</div>` : ''))}</tr>` };
@@ -2374,7 +2413,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.33';
+const BUILD = 'v2.34';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
