@@ -580,7 +580,8 @@ const alunoById = id => S.d.alunos.find(a => a.id === id) || (S.flow && (S.flow.
 const isGestor = () => !!(S.me && S.me.papel === 'gestor');
 const isFunc = () => !!(S.me && S.me.papel === 'funcionario');
 const effProf = (g, date) => { const a = S.d.atrib.find(x => x.grupo_id === g.id && String(x.data) === date); return a ? a.professor_id : g.professor_id; };
-const semAulaFor = (gid, date) => S.d.semAulas.find(x => x.grupo_id === gid && String(x.data) === date);
+const interrupFor = (gid, date) => { const g = S.d.grupos.find(z => z.id === gid); if (!g) return null; const pid = (localById(g.local_id) || {}).projeto_id; return (S.d.calend || []).find(x => x.tipo === 'interrupcao' && x.projeto_id === pid && (!x.local_id || x.local_id === g.local_id) && String(x.data_ini) <= date && date <= String(x.data_fim)) || null; };
+const semAulaFor = (gid, date) => S.d.semAulas.find(x => x.grupo_id === gid && String(x.data) === date) || (interrupFor(gid, date) ? { id: 'INT', grupo_id: gid, data: date, tipo: 'interrupcao', motivo: (interrupFor(gid, date).nome || 'Interrupção') } : undefined);
 const closedFor = (gid, data) => S.recent.find(r => r.grupoId === gid && r.data === data && r.estado !== 'anulada') || S.d.aulas.find(a => a.grupo_id === gid && a.data === data && a.estado !== 'anulada');
 
 function easter(y) { const a = y % 19, b = Math.floor(y / 100), c = y % 100, d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), hh = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - hh - k) % 7, m = Math.floor((a + 11 * hh + 22 * l) / 451), mo = Math.floor((hh + l - 7 * m + 114) / 31), da = ((hh + l - 7 * m + 114) % 31) + 1; return new Date(y, mo - 1, da); }
@@ -2431,7 +2432,7 @@ ${rows.join('')}</table>
    ===================================================================== */
 let lastBoot = 0, listening = false;
 function applyBoot(r) {
-  S.d = { projetos: r.projetos || [], locais: r.locais || [], grupos: r.grupos || [], professores: r.professores || [], alunos: r.alunos || [], atrib: r.atrib || [], semAulas: r.semAulas || [], aulas: r.aulas || [], aprovacoes: r.aprovacoes || [], gestao: r.gestao || null };
+  S.d = { projetos: r.projetos || [], locais: r.locais || [], grupos: r.grupos || [], professores: r.professores || [], alunos: r.alunos || [], atrib: r.atrib || [], semAulas: r.semAulas || [], calend: r.calend || [], aulas: r.aulas || [], aprovacoes: r.aprovacoes || [], gestao: r.gestao || null };
   ordenaDados();
   S.d.pedidos = r.pedidos || [];
   S.d.fotosPend = r.fotosPend || []; S.d.alteracoes = r.alteracoes || [];
@@ -2532,7 +2533,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.39';
+const BUILD = 'v2.40';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
