@@ -830,7 +830,7 @@ function sigModal() {
 }
 
 /* ---------- HOJE ---------- */
-function todaysGroups(date) { return S.d.grupos.filter(g => g.ativo !== 'nao' && Number(g.dia) === dow(date) && !semAulaFor(g.id, date)).sort((a, b) => toMin(a.hora_inicio) - toMin(b.hora_inicio)); }
+function todaysGroups(date) { return S.d.grupos.filter(g => g.ativo !== 'nao' && Number(g.dia) === dow(date) && inPeriod(g, date) && !semAulaFor(g.id, date)).sort((a, b) => toMin(a.hora_inicio) - toMin(b.hora_inicio)); }
 function collapsible(el, key, title, count, kids) {
   const open = !S.collapse[key];
   el.append(h('button', { class: 'row-between', style: 'width:100%;background:none;border:0;padding:0;margin:22px 0 10px;text-align:left', onclick: async () => { S.collapse[key] = open; await kv.set('collapse', S.collapse); render(); } },
@@ -845,6 +845,11 @@ function viewHoje() {
   const open = mine.filter(g => !closedFor(g.id, date));
   const next = open.slice().sort((a, b) => Math.abs(toMin(a.hora_inicio) + 30 - nowM) - Math.abs(toMin(b.hora_inicio) + 30 - nowM))[0];
   if (!mine.length) el.append(h('div', { class: 'card mut' }, 'Hoje não tens aulas marcadas.'));
+  /* v2.39: turmas de hoje cujo projeto ainda não começou (ou já acabou) não aparecem como aula; explica-se porquê */
+  S.d.grupos.filter(g => g.ativo !== 'nao' && Number(g.dia) === dow(date) && effProf(g, date) === S.me.id && !inPeriod(g, date) && !semAulaFor(g.id, date)).forEach(g => {
+    const pr = projById((localById(g.local_id) || {}).projeto_id) || {}, antes = pr.data_inicio && date < pr.data_inicio;
+    el.append(h('div', { class: 'hintline' }, `${g.nome || 'Turma'} · ${(localById(g.local_id) || {}).nome || ''}: ${antes ? 'o projeto só começa a ' + fmtLong(pr.data_inicio) : 'o período do projeto terminou a ' + fmtLong(pr.data_fim)}. Não há aula para registar. Se houve mesmo aula, usa «Outra aula ou substituição».`));
+  });
   if (next) el.append(nextCard(next));
   mine.filter(g => g !== next).forEach(g => el.append(classRow(g, date)));
   if (others.length) collapsible(el, 'outrasHoje', 'Outras aulas de hoje', others.length, others.map(g => classRow(g, date, true)));
@@ -2527,7 +2532,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.38';
+const BUILD = 'v2.39';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
