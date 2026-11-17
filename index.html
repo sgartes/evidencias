@@ -864,7 +864,7 @@ function viewHoje() {
     na ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'aprov'; go('tab', 'pend'); } }, `⏳ ${na} por aprovar ›`) : null));
   const bd = birthdays();
   if (bd.length) collapsible(el, 'aniv', 'Aniversários', bd.length, [h('div', { class: 'card', style: 'padding:6px 18px' }, ...bd.map(x => h('div', { class: 'row' }, avatar(x.a), h('div', { class: 'grow' }, h('b', {}, x.a.nome), h('div', { class: 'mut cap' }, `${x.diff === 0 ? 'Faz anos hoje 🎂' : x.diff === 1 ? 'Faz anos amanhã' : x.diff > 1 ? `Faz anos daqui a ${x.diff} dias` : x.diff === -1 ? 'Fez anos ontem' : `Fez anos há ${-x.diff} dias`} · ${x.a.aniv.split('-').reverse().join('/')}`)))))]);
-  const todo = S.recent.filter(r => r.form_estado === 'pendente' || r.post_estado === 'pendente' || r.estado === 'erro');
+  const todo = S.recent.filter(r => r.post_estado === 'pendente' || r.estado === 'erro');
   if (todo.length) collapsible(el, 'todo', 'Por fazer', todo.length, todo.map(r => todoCard(r)));
   return el;
 }
@@ -1145,7 +1145,6 @@ function todoCard(r) {
     h('b', {}, `${l.nome} · ${fmtShort(r.data)}`),
     h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap;margin-top:6px' },
       r.estado === 'erro' ? h('span', { class: 'chip bad' }, 'Erro ao enviar') : r.estado === 'por_enviar' ? h('span', { class: 'chip warn' }, 'Por enviar') : null,
-      r.form_estado === 'pendente' ? h('span', { class: 'chip warn' }, 'Formulário por enviar') : null,
       r.post_estado === 'pendente' ? h('span', { class: 'chip warn' }, 'Post por publicar') : null));
 }
 /* ---------- FLUXO: FECHAR AULA ---------- */
@@ -1598,18 +1597,8 @@ function viewDone() {
   if (rec.aprovacao === 'pendente') el.append(h('div', { class: 'hintline' }, 'Fora do período do projeto: a aguardar aprovação do gestor.'));
   if (sent && rec.nFotos && rec.fotosPorAprovar !== undefined) el.append(rec.fotosPorAprovar ? h('div', { class: 'hintline' }, `📷 ${rec.fotosPorAprovar} foto(s) a aguardar a aprovação de um gestor antes de aparecerem no site` + ((rec.fotoRgpd || []).length ? ` (sem RGPD: ${rec.fotoRgpd.join(', ')}).` : '.')) : h('div', { class: 'card', style: 'text-align:center' }, `📷 ${rec.fotosPublicadas} foto(s) publicada(s) no site ✓`));
   if (rec.semBanner) el.append(h('div', { class: 'hintline' }, 'Atenção: as fotos seguiram sem banner, porque o banner do local não carregou. Avisa o gestor.'));
-  // formulário
-  const fc = h('div', { class: 'card' }, h('b', { style: 'font-size:16.5px' }, '1. Formulário de evidências'));
-  if (rec.form_estado === 'enviado') fc.append(h('div', { style: 'margin-top:8px' }, h('span', { class: 'chip ok' }, 'Formulário enviado ✓')));
-  else {
-    if (!sent) fc.append(h('p', { class: 'mut' }, 'Fica disponível assim que a aula for enviada.'));
-    else if (rec.formUrl) fc.append(h('p', { class: 'mut' }, 'Abre já preenchido. Só falta anexar a foto e carregar em Enviar.'), h('a', { class: 'btn primary', href: rec.formUrl, target: '_blank', rel: 'noopener' }, 'Abrir formulário preenchido'));
-    else fc.append(h('p', { class: 'mut' }, !IS_GS ? 'Na versão ligada ao Google, aqui abre o formulário já preenchido.' : rec.formErro ? `Não consegui preparar o formulário: ${rec.formErro}. Preenche-o à mão.` : 'Este projeto ainda não tem o link do formulário na Sheet. Preenche-o à mão.'));
-    fc.append(h('button', { class: 'btn ghost', style: 'margin-top:10px', onclick: () => markEstado(rec, { form_estado: 'enviado' }) }, 'Já enviei o formulário ✓'));
-  }
-  el.append(fc);
   // post
-  const pc = h('div', { class: 'card' }, h('b', { style: 'font-size:16.5px' }, '2. Post no Instagram'));
+  const pc = h('div', { class: 'card' }, h('b', { style: 'font-size:16.5px' }, 'Post no Instagram'));
   if (rec.post_estado === 'na' && (projById(rec.projetoId) || {}).post_publico === 'sim') rec.post_estado = 'pendente';
   if (rec.post_estado === 'na') pc.append(h('p', { class: 'mut' }, 'Este projeto não publica nas redes. A evidência fica só na pasta do projeto.'));
   else if (rec.post_estado === 'nao_publicar') pc.append(h('p', { class: 'mut' }, 'Sem post: há alunos presentes sem consentimento RGPD assinado.'), h('button', { class: 'btn ghost', onclick: () => markEstado(rec, { post_estado: 'pendente' }) }, 'Afinal quero publicar'));
@@ -1688,7 +1677,6 @@ const GE = {
       { k: 'projeto_id', l: 'Projeto', type: 'select', opts: () => S.d.projetos.map(p => [p.id, p.nome]) },
       { k: 'nome', l: 'Nome do local' }, { k: 'morada', l: 'Morada' },
       { k: 'responsaveis', l: 'Responsáveis do local', help: 'Quem assina as presenças. Separa os nomes com ponto e vírgula (;).' },
-      { k: 'nome_no_formulario', l: 'Nome no formulário', help: 'Só se o formulário da entidade usar um nome diferente.' },
       { k: 'pasta_fotos', l: 'Pasta de fotos publicadas (link do Drive)', help: 'A subpasta deste local que o site mostra. As fotos chegam com banner e vão direto para aqui. Partilha-a como Editor com a conta da app. Vazio = ficam por aprovar.' }]
   },
   grupos: {
@@ -1730,7 +1718,6 @@ const GE = {
       { k: 'horas_coord', l: 'Horas de coordenação', help: 'Ex.: 42. São repartidas por igual pelas semanas com aulas no calendário de horas.' },
       { k: 'pasta_retiradas', l: 'Pasta de fotos retiradas (opcional)', help: 'Para onde vão as fotos que retirares do ar. Vazio = pasta «Não publicadas» do Drive da app.' },
       { k: 'estado', l: 'Estado do projeto', type: 'select', opts: ESTADOS_PROJ, def: 'ativo', help: 'Só se podem eliminar dados pessoais de alunos quando todos os projetos que frequentaram estão Encerrados.' },
-      { k: 'formulario_url', l: 'Link do formulário (https://…)', type: 'url' },
       { k: 'entidade_email', l: 'Email da entidade', type: 'email', help: 'Recebe um aviso quando um professor regista uma aula não prevista. Vazio = não envia nada.' },
       { k: 'post_publico', l: 'Publicações públicas nas redes?', type: 'select', opts: SIMNAO, def: 'nao', help: 'Para projetos com crianças, deixa em Não.' },
       { k: 'mencoes', l: 'Menções (@…)' }, { k: 'hashtags', l: 'Hashtags (#…)' },
@@ -2533,7 +2520,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.40';
+const BUILD = 'v2.41';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
