@@ -1725,7 +1725,7 @@ const GE = {
       { k: 'legenda_modelo', l: 'Legenda modelo', type: 'area' }]
   }
 };
-async function reloadAll() { const r = await API.boot(); if (IS_GS) await kv.set('boot', r); applyBoot(r); render(); }
+async function reloadAll() { const r = await API.boot(); if (IS_GS) await kv.set('boot', r); applyBoot(r, true); render(); }
 function geForm(sec, it, opt) {
   const spec = GE[sec], inputs = {}, err = h('p', { style: 'color:#c0392b;font-weight:700;margin:12px 0 0' });
   const cur = it || (opt && opt.preset) || {};
@@ -2418,13 +2418,21 @@ ${rows.join('')}</table>
    ARRANQUE
    ===================================================================== */
 let lastBoot = 0, listening = false;
-function applyBoot(r) {
+function reconcileRecent(r) {
+  if (!IS_GS || !r || !Array.isArray(r.aulas) || (S.queue || []).length) return;
+  const d0 = new Date(Date.now() - 55 * 86400000), corte = `${d0.getFullYear()}-${pad2(d0.getMonth() + 1)}-${pad2(d0.getDate())}`, ids = new Set(r.aulas.map(a => a.id));
+  const antes = S.recent.length;
+  S.recent = S.recent.filter(x => !(x.estado === 'enviada' && x.aulaId && String(x.data) > corte && !ids.has(x.aulaId)));
+  if (S.recent.length !== antes) saveRecent();
+}
+function applyBoot(r, fresh) {
   S.d = { projetos: r.projetos || [], locais: r.locais || [], grupos: r.grupos || [], professores: r.professores || [], alunos: r.alunos || [], atrib: r.atrib || [], semAulas: r.semAulas || [], calend: r.calend || [], aulas: r.aulas || [], aprovacoes: r.aprovacoes || [], gestao: r.gestao || null };
   ordenaDados();
   S.d.pedidos = r.pedidos || [];
   S.d.fotosPend = r.fotosPend || []; S.d.alteracoes = r.alteracoes || [];
   S.me = r.me ? Object.assign({}, S.d.professores.find(p => p.id === r.me.id) || {}, r.me) : null;
   lastBoot = Date.now();
+  if (fresh) reconcileRecent(r);
 }
 const ptCmp = (a, b) => String(a || '').localeCompare(String(b || ''), 'pt', { sensitivity: 'base' });
 function ordenaDados() {
@@ -2471,7 +2479,8 @@ function anuladaModal(x, done) {
       const c = openSheet('Eliminar o registo', h('p', { class: 'mut', style: 'margin-top:0' }, 'O registo desta aula \u00e9 eliminado de vez, com as presen\u00e7as. As fotos n\u00e3o se apagam: ficam na pasta Removidas do Drive. Fica registado quem eliminou.'), motivo,
         h('button', { class: 'btn bad', style: 'margin-top:12px', onclick: async () => {
           try { await API.eliminarAula(x.id, motivo.value.trim()); } catch (e) { toast(e.server ? e.message : 'Sem liga\u00e7\u00e3o. Eliminar precisa de rede.'); return; }
-          c.close(); s.close(); toast('Registo eliminado'); done();
+          for (let k = S.recent.length - 1; k >= 0; k--) if (S.recent[k].aulaId === x.id) S.recent.splice(k, 1);
+          await saveRecent(); c.close(); s.close(); toast('Registo eliminado'); done();
         } }, 'Eliminar definitivamente'));
     } }, 'Eliminar o registo'));
 }
@@ -2488,7 +2497,7 @@ function marcaAgua() {
 }
 async function refreshData(force) {
   if (!S.d || S.flow || !navigator.onLine || (!force && Date.now() - lastBoot < 60000)) return;
-  try { applyBoot(await API.boot()); if (!document.querySelector('.ov, .staff') && S.view !== 'flow') render(); } catch (e) { }
+  try { applyBoot(await API.boot(), true); if (!document.querySelector('.ov, .staff') && S.view !== 'flow') render(); } catch (e) { }
 }
 async function main() {
   S.collapse = await kv.get('collapse', {}); S.queue = await kv.get('queue', []); S.recent = await kv.get('recent', []);
@@ -2505,13 +2514,13 @@ async function main() {
   if (cached) {
     /* 2.36: abre logo com os dados guardados neste telemóvel e atualiza em segundo plano */
     applyBoot(cached); render(); flush();
-    API.boot().then(async x => { await kv.set('boot', x); applyBoot(x); if (!document.querySelector('.ov, .staff') && S.view !== 'flow' && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) render(); })
+    API.boot().then(async x => { await kv.set('boot', x); applyBoot(x, true); if (!document.querySelector('.ov, .staff') && S.view !== 'flow' && !(document.activeElement && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName))) render(); })
       .catch(e => { if (!e.auth) toast('Sem rede: a usar os dados guardados neste telemóvel.'); });
   } else {
     app.replaceChildren(h('div', { style: 'padding:40px 20px;text-align:center' }, h('b', {}, 'A abrir…')));
     try { r = await API.boot(); if (IS_GS) await kv.set('boot', r); }
     catch (e) { if (e.auth) return; app.replaceChildren(h('div', { style: 'padding:30px 20px' }, h('h1', {}, 'Não consegui abrir'), h('p', { class: 'mut' }, (e && e.message) || String(e)), h('p', { class: 'mut' }, 'Confirma que tens rede e tenta outra vez.'), h('button', { class: 'btn primary', onclick: () => location.reload() }, 'Tentar outra vez'))); return; }
-    applyBoot(r); render(); flush();
+    applyBoot(r, true); render(); flush();
   }
   if (!listening) {
     listening = true;
@@ -2520,7 +2529,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.41';
+const BUILD = 'v2.42';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
