@@ -910,8 +910,11 @@ function viewHoje() {
     nl ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'sem'; go('tab', 'pend'); } }, `🗂️ ${nl} sem evidências ›`) : null,
     ns ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'assin'; go('tab', 'pend'); } }, `✍️ ${ns} por assinar ›`) : null,
     na ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'aprov'; go('tab', 'pend'); } }, `⏳ ${na} por aprovar ›`) : null));
-  const pa = isGestor() ? proximosAnivs(5) : [];
-  if (pa.length) collapsible(el, 'proxAniv', 'Próximos aniversários', pa.length, [h('div', { class: 'card', style: 'padding:6px 18px' }, ...pa.map(x => h('div', { class: 'row' },
+  const pa = isGestor() ? proximosAnivs(5) : [], pp = isGestor() ? anivsPassados(7) : [];
+  if (pa.length || pp.length) collapsible(el, 'proxAniv', 'Aniversários', pa.length + pp.length, [h('div', { class: 'card', style: 'padding:6px 18px' }, ...pp.map(x => h('div', { class: 'row', style: 'opacity:.7' },
+    h('div', { style: 'min-width:46px;font-weight:700' }, x.dt.getDate() + '/' + String(x.dt.getMonth() + 1).padStart(2, '0')),
+    h('div', { class: 'grow' }, h('b', {}, x.nome), h('div', { class: 'mut cap' }, [`fez ${x.idade} anos`, x.dias === -1 ? 'ontem' : `há ${-x.dias} dias`, x.tipo + (x.local ? ' · ' + x.local : '')].join(' · '))))),
+    ...pa.map(x => h('div', { class: 'row' },
     h('div', { style: 'min-width:46px;font-weight:700' }, x.dt.getDate() + '/' + String(x.dt.getMonth() + 1).padStart(2, '0')),
     h('div', { class: 'grow' }, h('b', {}, x.nome), h('div', { class: 'mut cap' }, [`faz ${x.idade} anos`, x.dias === 0 ? 'hoje 🎂' : x.dias === 1 ? 'amanhã' : `daqui a ${x.dias} dias`, x.tipo + (x.local ? ' · ' + x.local : '')].join(' · '))))))]);
   const bd = isGestor() ? [] : birthdays();
@@ -922,17 +925,22 @@ function viewHoje() {
 }
 const LOOKBACK = 30;
 /* 2.46: os 5 próximos aniversários (alunos e equipa) para o gestor; a data de nascimento dos professores só o gestor tem */
-function proximosAnivs(n) {
+function listaAnivs_() {
   const t = parseD(today()), out = [], lname = id => (S.d.locais.find(l => l.id === id) || {}).nome || '';
   const add = (nome, dn, local, tipo) => {
     if (!/^\d{4}-\d\d-\d\d$/.test(dn || '')) return;
     const [y, m, d] = dn.split('-').map(Number); let dt = new Date(t.getFullYear(), m - 1, d); if (dt < t) dt = new Date(t.getFullYear() + 1, m - 1, d);
     out.push({ nome, dt, idade: dt.getFullYear() - y, local, tipo, dias: Math.round((dt - t) / 864e5) });
+    let pv = new Date(t.getFullYear(), m - 1, d); if (pv >= t) pv = new Date(t.getFullYear() - 1, m - 1, d);
+    out.push({ nome, dt: pv, idade: pv.getFullYear() - y, local, tipo, dias: Math.round((pv - t) / 864e5) });
   };
   S.d.alunos.forEach(a => { if (a.ativo === 'nao' || a.rgpd_estado === 'eliminado') return; add(a.nome, a.data_nascimento, lname(a.local_id), 'Aluno'); });
   ((S.d.gestao && S.d.gestao.professores) || []).forEach(p => { if (p.ativo === 'nao') return; add(p.nome, p.data_nascimento, p.papel === 'funcionario' ? String(p.locais || '').split(/[;,\s]+/).filter(Boolean).map(lname).join(', ') : '', p.papel === 'funcionario' ? 'Funcionário' : p.papel === 'gestor' ? 'Gestor' : 'Professor'); });
-  return out.sort((a, b) => a.dt - b.dt || a.nome.localeCompare(b.nome)).slice(0, n);
+  return out;
 }
+function proximosAnivs(n) { return listaAnivs_().filter(x => x.dias >= 0).sort((a, b) => a.dt - b.dt || a.nome.localeCompare(b.nome)).slice(0, n); }
+/* 2.50: quem fez anos nos últimos n dias (mais recentes primeiro) */
+function anivsPassados(n) { return listaAnivs_().filter(x => x.dias < 0 && x.dias >= -n).sort((a, b) => b.dt - a.dt || a.nome.localeCompare(b.nome)); }
 function birthdays() {
   const t = parseD(today()), mineG = new Set(S.d.grupos.filter(g => g.professor_id === S.me.id).map(g => g.id)), mineL = new Set(S.d.grupos.filter(g => mineG.has(g.id)).map(g => g.local_id)), out = [];
   S.d.alunos.forEach(a => {
@@ -2846,7 +2854,7 @@ async function main() {
 }
 window.addEventListener('hashchange', () => { if (/^#rgpd=[a-f0-9]{20}$/.test(location.hash)) location.reload(); }); /* 2.49 */
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.49';
+const BUILD = 'v2.50';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
