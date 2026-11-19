@@ -862,13 +862,29 @@ function viewHoje() {
     nl ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'sem'; go('tab', 'pend'); } }, `🗂️ ${nl} sem evidências ›`) : null,
     ns ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'assin'; go('tab', 'pend'); } }, `✍️ ${ns} por assinar ›`) : null,
     na ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'aprov'; go('tab', 'pend'); } }, `⏳ ${na} por aprovar ›`) : null));
-  const bd = birthdays();
+  const pa = isGestor() ? proximosAnivs(5) : [];
+  if (pa.length) collapsible(el, 'proxAniv', 'Próximos aniversários', pa.length, [h('div', { class: 'card', style: 'padding:6px 18px' }, ...pa.map(x => h('div', { class: 'row' },
+    h('div', { style: 'min-width:46px;font-weight:700' }, x.dt.getDate() + '/' + String(x.dt.getMonth() + 1).padStart(2, '0')),
+    h('div', { class: 'grow' }, h('b', {}, x.nome), h('div', { class: 'mut cap' }, [`faz ${x.idade} anos`, x.dias === 0 ? 'hoje 🎂' : x.dias === 1 ? 'amanhã' : `daqui a ${x.dias} dias`, x.tipo + (x.local ? ' · ' + x.local : '')].join(' · '))))))]);
+  const bd = isGestor() ? [] : birthdays();
   if (bd.length) collapsible(el, 'aniv', 'Aniversários', bd.length, [h('div', { class: 'card', style: 'padding:6px 18px' }, ...bd.map(x => h('div', { class: 'row' }, avatar(x.a), h('div', { class: 'grow' }, h('b', {}, x.a.nome), h('div', { class: 'mut cap' }, `${x.diff === 0 ? 'Faz anos hoje 🎂' : x.diff === 1 ? 'Faz anos amanhã' : x.diff > 1 ? `Faz anos daqui a ${x.diff} dias` : x.diff === -1 ? 'Fez anos ontem' : `Fez anos há ${-x.diff} dias`} · ${x.a.aniv.split('-').reverse().join('/')}`)))))]);
   const todo = S.recent.filter(r => r.post_estado === 'pendente' || r.estado === 'erro');
   if (todo.length) collapsible(el, 'todo', 'Por fazer', todo.length, todo.map(r => todoCard(r)));
   return el;
 }
 const LOOKBACK = 30;
+/* 2.46: os 5 próximos aniversários (alunos e equipa) para o gestor; a data de nascimento dos professores só o gestor tem */
+function proximosAnivs(n) {
+  const t = parseD(today()), out = [], lname = id => (S.d.locais.find(l => l.id === id) || {}).nome || '';
+  const add = (nome, dn, local, tipo) => {
+    if (!/^\d{4}-\d\d-\d\d$/.test(dn || '')) return;
+    const [y, m, d] = dn.split('-').map(Number); let dt = new Date(t.getFullYear(), m - 1, d); if (dt < t) dt = new Date(t.getFullYear() + 1, m - 1, d);
+    out.push({ nome, dt, idade: dt.getFullYear() - y, local, tipo, dias: Math.round((dt - t) / 864e5) });
+  };
+  S.d.alunos.forEach(a => { if (a.ativo === 'nao' || a.rgpd_estado === 'eliminado') return; add(a.nome, a.data_nascimento, lname(a.local_id), 'Aluno'); });
+  ((S.d.gestao && S.d.gestao.professores) || []).forEach(p => { if (p.ativo === 'nao') return; add(p.nome, p.data_nascimento, p.papel === 'funcionario' ? String(p.locais || '').split(/[;,\s]+/).filter(Boolean).map(lname).join(', ') : '', p.papel === 'funcionario' ? 'Funcionário' : p.papel === 'gestor' ? 'Gestor' : 'Professor'); });
+  return out.sort((a, b) => a.dt - b.dt || a.nome.localeCompare(b.nome)).slice(0, n);
+}
 function birthdays() {
   const t = parseD(today()), mineG = new Set(S.d.grupos.filter(g => g.professor_id === S.me.id).map(g => g.id)), mineL = new Set(S.d.grupos.filter(g => mineG.has(g.id)).map(g => g.local_id)), out = [];
   S.d.alunos.forEach(a => {
@@ -1198,14 +1214,23 @@ function setStep(n) { S.flow.step = n; go(); }
 
 /* passo 1: presenças */
 function stepPres() {
-  const f = S.flow, box = h('div');
+  const f = S.flow, box = h('div'), aviso = h('div');
+  /* 2.46: avisa se há alunos da chamada sem data de nascimento */
+  const avisoNasc = () => {
+    const sem = f.lista ? f.order.map(alunoById).filter(a => a && a.ativo !== 'nao' && !a.aniv) : [];
+    aviso.replaceChildren(...(sem.length ? [h('details', { class: 'card', style: 'margin-bottom:10px;border-color:var(--warn,#d9a400)' },
+      h('summary', { style: 'font-weight:700;cursor:pointer' }, `🎂 ${sem.length} aluno(s) sem data de nascimento`),
+      h('p', { class: 'mut cap', style: 'margin:8px 0' }, 'Preenche-a na ficha do aluno: serve para os avisos de aniversário e para a idade. Toca no nome.'),
+      h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, ...sem.map(a => h('button', { class: 'chip warn', onclick: () => alunoModal(a, { localId: a.local_id, grupoId: a.grupo_id, onSave: async out => { await saveAlunoEdit(out); const x = alunoById(a.id); if (x) Object.assign(x, out); avisoNasc(); } }) }, a.nome + ' ›'))))] : []));
+  };
+  avisoNasc();
   const paint = () => {
     const c = counts();
     box.replaceChildren(f.lista ? deckUI(paint) : counterUI(),
       footer(null, () => setStep(2), 'Seguinte ›', f.lista ? c.falta === 0 : true,
         f.lista ? (c.falta ? `Faltam ${c.falta} por marcar` : (c.t === 0 ? 'Ninguém veio? Podes continuar na mesma.' : '')) : (c.t === 0 ? 'Total 0 — confirma que ninguém veio.' : '')));
   };
-  paint(); return box;
+  paint(); return h('div', {}, aviso, box);
 }
 function counterUI() {
   const f = S.flow;
@@ -1714,6 +1739,7 @@ const GE = {
     fields: () => [
       { k: 'nome', l: 'Nome' },
       { k: 'email', l: 'Email', type: 'email', help: 'Professores e gestores entram com a conta Google deste email. Funcionários recebem neste email um código de entrada.' },
+      { k: 'data_nascimento', l: 'Data de nascimento', type: 'date', help: 'Só o gestor vê. Serve para os próximos aniversários no ecrã Hoje.' },
       { k: 'papel', l: 'Função', type: 'select', opts: () => [['professor', 'Professor'], ['gestor', 'Gestor'], ['funcionario', 'Funcionário da instituição']], def: 'professor' },
       { k: 'locais', l: 'Local (só para funcionários)', type: 'select', opts: () => [['', '—'], ...S.d.locais.map(l => [l.id, l.nome + ' · ' + ((projById(l.projeto_id) || {}).nome || '')])], def: '', help: 'O funcionário só vê e assina as aulas deste local.' },
       { k: 'valor_aula', l: 'Valor por aula (€)', type: 'number', help: 'Vazio = valor padrão.' },
@@ -2540,7 +2566,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.45';
+const BUILD = 'v2.46';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
