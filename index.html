@@ -444,6 +444,16 @@ const API = {
     const L = DEMO.locais.find(l => l.id === localId) || {}, ln = id => (DEMO.locais.find(l => l.id === id) || {}).nome || '', gn = id => (DEMO.grupos.find(g => g.id === id) || {}).nome || '';
     return { ok: true, alunos: DEMO.alunos.filter(a => a.ativo !== 'nao' && (DEMO.locais.find(l => l.id === a.local_id) || {}).projeto_id === L.projeto_id).map(a => Object.assign(demoAluno(a), { local_nome: ln(a.local_id), grupo_nome: gn(a.grupo_id) })) };
   },
+  async outrasTurmasSemana(grupoId, data) {
+    if (IS_GS) return gs('apiOutrasTurmasSemana', grupoId, data);
+    const d = parseD(data), dow = (d.getDay() + 6) % 7, ini = new Date(d.getFullYear(), d.getMonth(), d.getDate() - dow), fim = new Date(ini.getFullYear(), ini.getMonth(), ini.getDate() + 6);
+    const ymd = x => x.getFullYear() + '-' + String(x.getMonth() + 1).padStart(2, '0') + '-' + String(x.getDate()).padStart(2, '0'), a0 = ymd(ini), a1 = ymd(fim), out = {};
+    DEMO.aulas.filter(a => a.grupo_id !== grupoId && a.estado !== 'anulada' && a.data >= a0 && a.data <= a1).forEach(a => (a.presencas || []).forEach(x => {
+      const al = DEMO.alunos.find(z => z.id === x.alunoId); if (!x.presente || !al || al.grupo_id !== grupoId) return;
+      (out[x.alunoId] = out[x.alunoId] || []).push({ data: a.data, turma: (DEMO.grupos.find(g => g.id === a.grupo_id) || {}).nome || '', local: (DEMO.locais.find(l => l.id === a.local_id) || {}).nome || '', e: x.etiqueta || '' });
+    }));
+    return { ok: true, fora: out };
+  },
   async folhaTurma(grupoId, mes) {
     if (IS_GS) return gs('apiFolhaTurma', grupoId, mes);
     const G = id => DEMO.grupos.find(g => g.id === id) || {}, Lo = id => DEMO.locais.find(l => l.id === id) || {}, A = id => DEMO.alunos.find(a => a.id === id), g = G(grupoId), loc = Lo(g.local_id);
@@ -780,7 +790,8 @@ function viewAlunosFunc() {
   const nomes = (S.me.locais || []).map(id => (localById(id) || {}).nome).filter(Boolean).join(', ');
   el.append(h('h1', {}, `Olá, ${firstName(S.me.nome)}`), h('p', { class: 'mut', style: 'margin-top:0' }, 'Funcionário da instituição' + (nomes ? ' · ' + nomes : '')), funcTabs(),
     h('p', { class: 'cap', style: 'margin:0 0 12px' }, 'Proponha novos alunos ou corrija os dados. A SGArtes aprova antes de ficar em vigor.'),
-    h('button', { class: 'btn primary', onclick: () => alunoModal(null, { localId: locId, onSave: proporAlunoFunc }) }, '＋ Propor novo aluno'), h('div', { style: 'height:12px' }));
+    h('button', { class: 'btn primary', onclick: () => alunoModal(null, { localId: locId, onSave: proporAlunoFunc }) }, '＋ Propor novo aluno'), h('div', { style: 'height:8px' }),
+    h('button', { class: 'btn ghost', onclick: () => folhaTurmaModal('') }, '📋 Folha mensal da turma'), h('div', { style: 'height:12px' }));
   const lista = h('div', { class: 'card', style: 'padding:6px 16px' });
   lista.replaceChildren(...(rows.length ? rows.map(a => h('button', { class: 'row', style: 'width:100%;background:none;border:0;text-align:left;border-bottom:1px solid var(--line)', onclick: () => alunoModal(a, { onSave: proporAlunoFunc }) },
     avatar(a), h('div', { class: 'grow' }, h('b', {}, a.nome), h('div', { class: 'mut cap' }, `${a.genero === 'H' ? 'Homem' : a.genero === 'M' ? 'Mulher' : 'Género por indicar'} · ${a.grupo_id ? ((grupoById(a.grupo_id) || {}).nome || 'grupo') : 'sem grupo'}${a.ativo === 'nao' ? ' · inativo' : ''}${a.rgpd_estado === 'recusado' ? ' · recusou RGPD' : RGPD_OK.includes(a.rgpd_estado) ? '' : rgpdEspaco(a.local_id) ? ' · RGPD do espaço' : ' · 🔏 RGPD por assinar'}`)),
@@ -1231,9 +1242,16 @@ function setStep(n) { S.flow.step = n; go(); }
 function stepPres() {
   const f = S.flow, box = h('div'), aviso = h('div');
   /* 2.46: avisa se há alunos da chamada sem data de nascimento */
+  if (f.lista && f.foraSem === undefined) {
+    f.foraSem = null;
+    API.outrasTurmasSemana(f.g.id, f.data).then(r => { if (S.flow !== f) return; f.foraSem = r.fora || {}; if (Object.keys(f.foraSem).length) { avisoNasc(); try { paint(); } catch (e) { } } }).catch(() => { f.foraSem = {}; });
+  }
   const avisoNasc = () => {
+    const fs = Object.keys(f.foraSem || {}).filter(id => f.order.includes(id)).map(alunoById).filter(Boolean);
+    const blocoFora = fs.length ? h('div', { class: 'card', style: 'margin-bottom:10px;background:#fff8ee' }, h('b', {}, `↪ ${fs.length} aluno(s) desta turma já vieram a outra aula esta semana`),
+      ...fs.map(a => { const u = f.foraSem[a.id][f.foraSem[a.id].length - 1]; return h('div', { class: 'mut cap', style: 'margin-top:4px' }, `${a.nome}: ${u.data.slice(8, 10)}/${u.data.slice(5, 7)} na turma ${u.turma}${u.local && u.local !== f.local.nome ? ' (' + u.local + ')' : ''}${u.e && ETIQ[u.e] ? ' · ' + ETIQ[u.e][1].toLowerCase() : ''}`); })) : null;
     const sem = f.lista ? f.order.map(alunoById).filter(a => a && a.ativo !== 'nao' && !a.aniv) : [];
-    aviso.replaceChildren(...(sem.length ? [h('details', { class: 'card', style: 'margin-bottom:10px;border-color:var(--warn,#d9a400)' },
+    aviso.replaceChildren(...(blocoFora ? [blocoFora] : []), ...(sem.length ? [h('details', { class: 'card', style: 'margin-bottom:10px;border-color:var(--warn,#d9a400)' },
       h('summary', { style: 'font-weight:700;cursor:pointer' }, `🎂 ${sem.length} aluno(s) sem data de nascimento`),
       h('p', { class: 'mut cap', style: 'margin:8px 0' }, 'Preenche-a na ficha do aluno: serve para os avisos de aniversário e para a idade. Toca no nome.'),
       h('div', { style: 'display:flex;gap:6px;flex-wrap:wrap' }, ...sem.map(a => h('button', { class: 'chip warn', onclick: () => alunoModal(a, { localId: a.local_id, grupoId: a.grupo_id, onSave: async out => { await saveAlunoEdit(out); const x = alunoById(a.id); if (x) Object.assign(x, out); avisoNasc(); } }) }, a.nome + ' ›'))))] : []));
@@ -1278,7 +1296,7 @@ function deckUI(paint) {
         const v = f.marks[a.id];
         return h('button', { type: 'button', 'aria-pressed': v === true ? 'true' : 'false', style: `border:3px solid ${v === true ? 'var(--ok)' : v === false ? 'var(--bad-l)' : 'var(--line)'};background:${v === true ? 'var(--ok-l)' : '#fff'};border-radius:16px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);opacity:${v === false ? '.55' : '1'}`,
           onclick: () => { if (v === true) delete f.marks[a.id]; else { f.marks[a.id] = true; f.history.push(a.id); } paint(); } },
-          avatar(a), h('span', { style: 'text-align:center;line-height:1.2' }, a.nome.split(' ').filter(Boolean).slice(0, 2).join(' ')), semRgpdA(a) ? h('span', { class: 'chip rgpd', style: 'font-size:11px;padding:2px 8px' }, 'RGPD por assinar') : null, etiqChip(a.id), v === true ? h('span', { class: 'chip ok' }, '✓ Veio') : v === false ? h('span', { class: 'chip bad' }, 'Faltou') : null);
+          avatar(a), h('span', { style: 'text-align:center;line-height:1.2' }, a.nome.split(' ').filter(Boolean).slice(0, 2).join(' ')), semRgpdA(a) ? h('span', { class: 'chip rgpd', style: 'font-size:11px;padding:2px 8px' }, 'RGPD por assinar') : null, etiqChip(a.id), foraChip(a.id), v === true ? h('span', { class: 'chip ok' }, '✓ Veio') : v === false ? h('span', { class: 'chip bad' }, 'Faltou') : null);
       })),
       h('div', { class: 'tools', style: 'margin-top:12px;gap:8px;flex-wrap:wrap' },
         resto.length ? h('button', { class: 'btn ghost small', onclick: () => { resto.forEach(id => { f.marks[id] = false; }); f.history.push(resto); paint(); } }, `Os restantes ${resto.length} faltaram`) : null,
@@ -1304,7 +1322,7 @@ function deckUI(paint) {
       res.replaceChildren(...(q.length < 2 ? [] : list.filter(a => f.marks[a.id] === undefined && a.nome.toLowerCase().includes(q)).slice(0, 6).map(a => h('button', { class: 'namechip', onclick: () => { f.marks[a.id] = true; f.history.push(a.id); f.q = ''; paint(); } }, '✓ ' + a.nome))));
     };
     paintRes(); wrap.append(qIn, res);
-    const card = h('div', { class: 'sw', 'data-dir': '' }, avatar(cur, true), h('div', { class: 'nm' }, cur.nome), etiqChip(cur.id), semRgpdA(cur) ? h('span', { class: 'chip rgpd' }, 'RGPD por assinar') : null, h('div', { class: 'hint' }, '‹ desliza: faltou · veio: desliza ›'));
+    const card = h('div', { class: 'sw', 'data-dir': '' }, avatar(cur, true), h('div', { class: 'nm' }, cur.nome), etiqChip(cur.id), foraChip(cur.id), semRgpdA(cur) ? h('span', { class: 'chip rgpd' }, 'RGPD por assinar') : null, h('div', { class: 'hint' }, '‹ desliza: faltou · veio: desliza ›'));
     attachSwipe(card, v => decide(v, card));
     wrap.append(h('div', { class: 'deck' }, card),
       h('div', { class: 'decide' }, h('button', { class: 'btn bad', onclick: () => decide(false, card) }, '✗ Faltou'), h('button', { class: 'btn ok', onclick: () => decide(true, card) }, '✓ Veio')));
@@ -1351,6 +1369,8 @@ function attachSwipe(card, onDecide) {
 }
 /* 2.47: aluno de outra turma do mesmo projeto, presente só nesta aula, com etiqueta (fica registada na presença) */
 const ETIQ = { compensacao: ['🔁', 'Compensação', 'Repõe uma aula que faltou'], troca: ['↔️', 'Troca de turma', 'Hoje veio em vez da sua turma'], visita: ['👋', 'Visita / outro motivo', 'Outro motivo (ex.: vem de outro local)'] };
+/* 2.48: aluno desta turma que já foi a outra aula esta semana (compensação, troca…) */
+function foraChip(id) { const x = S.flow && (S.flow.foraSem || {})[id]; if (!x || !x.length) return null; const u = x[x.length - 1]; return h('span', { class: 'chip', style: 'font-size:11px;padding:2px 8px;background:#fff3e0;color:#8a4b00' }, `↪ veio ${u.data.slice(8, 10)}/${u.data.slice(5, 7)} · ${u.turma}${u.e && ETIQ[u.e] ? ' · ' + ETIQ[u.e][1].toLowerCase() : ''}`); }
 function etiqChip(id) { const e = S.flow && (S.flow.etiq || {})[id]; return e && ETIQ[e] ? h('span', { class: 'chip warn', style: 'font-size:11px;padding:2px 8px' }, ETIQ[e][0] + ' ' + ETIQ[e][1]) : null; }
 async function alunosDoProjeto(local) {
   S.projAl = S.projAl || {}; const k = local.projeto_id;
@@ -2308,7 +2328,7 @@ function viewAlunos() {
 }
 /* 2.47: folha de turma por mês (local + turma): foto, nome completo e presenças de cada aula; mostra quem veio de outra turma e quem foi a outra turma */
 function folhaTurmaModal(localId) {
-  const gs_ = S.d.grupos.filter(g => g.ativo !== 'nao' && (isGestor() || g.professor_id === S.me.id) && (!localId || g.local_id === localId))
+  const gs_ = S.d.grupos.filter(g => g.ativo !== 'nao' && (isGestor() || g.professor_id === S.me.id || (isFunc() && (S.me.locais || []).includes(g.local_id))) && (!localId || g.local_id === localId))
     .sort((a, b) => ((localById(a.local_id) || {}).nome || '').localeCompare((localById(b.local_id) || {}).nome || '') || Number(a.dia) - Number(b.dia) || String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
   if (!gs_.length) { toast('Não tens turmas para mostrar.'); return; }
   const st = S.ft = Object.assign({ g: gs_[0].id, mes: today().slice(0, 7) }, S.ft || {}); if (!gs_.some(g => g.id === st.g)) st.g = gs_[0].id;
@@ -2669,7 +2689,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.47';
+const BUILD = 'v2.48';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
