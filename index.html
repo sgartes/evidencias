@@ -2466,7 +2466,7 @@ function localPick(o) {
   btn.onclick = () => {
     const q = h('input', { class: 'in', type: 'search', placeholder: 'Pesquisar local, entidade ou projeto' }), list = h('div', {});
     let sh;
-    const pickV = v => { val = v; paint(); sh.close(); if (o.onchange) o.onchange({ target: btn }); };
+    const pickV = v => { val = v; paint(); sh.close(); if (o.onchange) o.onchange({ target: btn }); btn.dispatchEvent(new Event('change')); /* 2.45: a ficha do aluno ouve 'change' */ };
     const row = (txt, v) => h('button', { type: 'button', style: 'display:block;width:100%;text-align:left;background:' + (v === val ? '#FFF0EA' : 'none') + ';border:0;border-bottom:1px solid #eee;padding:12px 6px;font:inherit;cursor:pointer;color:inherit', onclick: () => pickV(v) }, h('b', {}, txt));
     const paintL = () => {
       const t = norm(q.value), kids = [], g = {};
@@ -2540,7 +2540,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.44';
+const BUILD = 'v2.45';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
