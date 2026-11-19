@@ -1315,7 +1315,7 @@ function novoAlunoFlow(paint) {
 const RGPD_OK = ['assinado', 'testemunhado'];
 function rgpdText(crianca, temFoto) {
   return (crianca ? 'Autorizo, como encarregado(a) de educação, ' : 'Autorizo ') + 'a SGArtes a tratar estes dados apenas para gerir as aulas. ' +
-    (crianca ? 'Não é guardada fotografia individual do menor. ' : temFoto ? 'A fotografia individual serve só para organização interna da associação e não é publicada. ' : '') +
+    (crianca ? 'Não é guardada fotografia individual do menor. ' : '') +
     'As fotografias de grupo tiradas no fim das aulas são publicadas, ao abrigo do projeto, no site e nas redes sociais da SGArtes e das entidades parceiras' + (crianca ? ' (no caso de crianças, só na pasta interna do projeto)' : '') + '. Posso retirar este consentimento a qualquer momento junto da SGArtes.';
 }
 /* janela de aluno (novo ou editar) */
@@ -1383,7 +1383,7 @@ function alunoModal(a, opt) {
           : h('p', { class: 'mut', style: 'margin:6px 0 0' }, 'Ainda sem registos de presença.'));
     }).catch(() => histBox.replaceChildren(h('span', { class: 'mut' }, 'Não consegui carregar as presenças (sem ligação).')));
   }
-  const s = openSheet(a ? 'Aluno' : 'Novo aluno', av, file, fileG, crianca ? null : h('p', { class: 'mut cap', style: 'margin:6px 0 0' }, 'A foto individual só fica guardada com o consentimento RGPD registado.'), a ? histBox : null, isFunc() ? h('p', { class: 'cap', style: 'margin:0 0 8px' }, 'Isto fica como pedido: só passa a valer depois de o gestor aprovar.') : null,
+  const s = openSheet(a ? 'Aluno' : 'Novo aluno', av, file, fileG, crianca ? null : h('p', { class: 'mut cap', style: 'margin:6px 0 0' }, 'Foto de perfil só para registo interno (não é publicada). Tira-a apenas com autorização verbal da pessoa; não depende do RGPD.'), a ? histBox : null, isFunc() ? h('p', { class: 'cap', style: 'margin:0 0 8px' }, 'Isto fica como pedido: só passa a valer depois de o gestor aprovar.') : null,
     h('label', { class: 'l' }, 'Nome completo'), nome, h('label', { class: 'l' }, 'Género (conta para os totais)'), seg, h('label', { class: 'l' }, 'Idade'), kidSeg,
     opt.fixed ? null : [h('label', { class: 'l' }, 'Local'), localSel, h('label', { class: 'l' }, 'Grupo'), grupoSel],
     seeData ? h('details', { style: 'margin-top:14px' }, h('summary', { style: 'font-weight:700;padding:8px 0' }, 'Contacto e data de nascimento (podem ficar para depois)'), h('label', { class: 'l' }, 'Contacto'), contacto, h('label', { class: 'l' }, 'Data de nascimento'), nasc, a ? null : h('p', { class: 'mut cap' }, 'Depois de guardados, só o gestor os vê. O professor recebe apenas o aviso de aniversário.')) : null,
@@ -1402,7 +1402,6 @@ function alunoModal(a, opt) {
         if ((rgpdModo === 'agora' || rgpdModo === 'testemunha' || rgpdModo === 'papel') && rgpdSig) { out.rgpdAssinatura = rgpdSig; out.rgpdModo = rgpdModo; out.rgpd_estado = rgpdModo === 'testemunha' ? 'testemunhado' : 'assinado'; out.rgpd_data = today(); }
         else out.rgpd_estado = rgpdModo === 'recusado' ? 'recusado' : 'pendente';
       }
-      if (!RGPD_OK.includes(out.rgpd_estado)) out.foto_mini = '';
       s.close(); await opt.onSave(out);
     } }, 'Guardar'), ...(a && isGestor() ? [h('button', { class: 'btn bad', style: 'margin-top:10px', onclick: () => eliminarAlunoModal(a, s) }, 'Eliminar dados pessoais…')] : []));
   if (!a) setTimeout(() => nome.focus(), 60);
@@ -2541,7 +2540,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.43';
+const BUILD = 'v2.44';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
