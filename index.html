@@ -394,6 +394,28 @@ const API = {
   async pedirCodigo(email) { return gs('pedirCodigo', email); },
   async entrarCodigo(email, codigo) { return gs('entrarCodigo', email, codigo); },
   async entrarLink(tk) { return gs('entrarLink', tk); },
+  async convite(alunoId) {
+    if (IS_GS) return gs('apiConvite', alunoId);
+    const a = DEMO.alunos.find(x => x.id === alunoId) || {}; DEMO.convites = DEMO.convites || {};
+    let tk = Object.keys(DEMO.convites).find(k => DEMO.convites[k].aluno_id === alunoId && !DEMO.convites[k].resp);
+    if (!tk) { tk = Array.from({ length: 20 }, () => '0123456789abcdef'[Math.floor(Math.random() * 16)]).join(''); DEMO.convites[tk] = { aluno_id: alunoId }; }
+    return { ok: true, token: tk, falta: demoFalta(a), crianca: a.crianca === 'sim', contacto: a.contacto || '' };
+  },
+  async conviteVer(tk) {
+    if (IS_GS) return gs('conviteVer', tk);
+    const c = (DEMO.convites || {})[tk]; if (!c) throw Object.assign(new Error('Este link não existe. Peça um novo ao professor.'), { server: true });
+    if (c.resp) return { ok: true, fechado: 'Este pedido já foi respondido. Obrigado!' };
+    const a = DEMO.alunos.find(x => x.id === c.aluno_id) || {}, n = String(a.nome || '').split(' ');
+    return { ok: true, nome: n[0] + (n.length > 1 ? ' ' + n[n.length - 1][0] + '.' : ''), local: (DEMO.locais.find(l => l.id === a.local_id) || {}).nome || '', crianca: a.crianca === 'sim', falta: demoFalta(a), texto: rgpdText(a.crianca === 'sim'), versao: 'v1 (2026-11)' };
+  },
+  async conviteResponder(tk, d) {
+    if (IS_GS) return gs('conviteResponder', tk, d);
+    const c = (DEMO.convites || {})[tk], a = DEMO.alunos.find(x => x.id === c.aluno_id) || {}, f = demoFalta(a);
+    if (f.rgpd && !f.rgpdEspaco && !d.decisao) throw Object.assign(new Error('Escolha se aceita ou não o consentimento.'), { server: true });
+    if (f.contacto && d.contacto) a.contacto = d.contacto; if (f.nasc && d.data_nascimento) a.data_nascimento = d.data_nascimento;
+    if (f.rgpd && d.decisao) { a.rgpd_estado = d.decisao === 'aceito' ? 'digital' : 'recusado'; a.rgpd_data = today(); }
+    c.resp = true; return { ok: true, rgpd: a.rgpd_estado, dados: true };
+  },
   async linkFuncionario(pid) { if (IS_GS) return gs('apiLinkFuncionario', pid); return { ok: true, url: 'https://evidencias.sgartes.pt/#entrar=demo' }; },
   async pedirAssinatura(localId, ids, nota, lembrete, preview) { if (IS_GS) return gs('apiPedirAssinatura', localId, ids, nota, lembrete, preview); if (preview) return { ok: true, preview: true, para: ['funcionario@exemplo.pt'], responder: 'geral@sgartes.pt', assunto: 'Assinatura de aulas (exemplo)', corpo: 'Bom dia, (modo de demonstração: no modo real aparece aqui o texto do email, com a lista das aulas.)' }; return { ok: true, enviados: 1, aulas: ids.length, demo: true }; },
   async proporAluno(a) { if (IS_GS) return gs('apiProporAluno', a); return { ok: true, demo: true, alteracao: { id: 'AL-demo-' + Date.now(), tipo: DEMO.alunos.some(z => z.id === a.id) ? 'editar' : 'novo', aluno_id: a.id, estado: 'pendente', criado_em: new Date().toISOString(), nome: a.nome, local_id: a.local_id } }; },
@@ -1405,12 +1427,143 @@ async function visitaFlow(paint) {
   };
   q.addEventListener('input', pintar); pintar(); setTimeout(() => q.focus(), 60);
 }
+/* 2.49: gerador de QR code (modo byte, correção M, versões 1–10), sem bibliotecas externas */
+function qrMatrix(text) {
+  const data = [...new TextEncoder().encode(text)];
+  const ECC = [0, 10, 16, 26, 18, 24, 16, 18, 22, 22, 26], NB = [0, 1, 1, 1, 2, 2, 4, 4, 4, 5, 5];
+  const rawMods = v => { let r = (16 * v + 128) * v + 64; if (v >= 2) { const na = Math.floor(v / 7) + 2; r -= (25 * na - 10) * na - 55; if (v >= 7) r -= 36; } return r; };
+  const dataCw = v => Math.floor(rawMods(v) / 8) - ECC[v] * NB[v];
+  let ver = 1; while (ver <= 10 && 4 + (ver < 10 ? 8 : 16) + data.length * 8 > dataCw(ver) * 8) ver++;
+  if (ver > 10) throw new Error('Texto demasiado longo para o QR.');
+  const bb = [], app = (val, len) => { for (let i = len - 1; i >= 0; i--) bb.push((val >>> i) & 1); };
+  app(4, 4); app(data.length, ver < 10 ? 8 : 16); data.forEach(b => app(b, 8));
+  const cap = dataCw(ver) * 8; app(0, Math.min(4, cap - bb.length)); app(0, (8 - bb.length % 8) % 8);
+  for (let p = 0xEC; bb.length < cap; p ^= 0xEC ^ 0x11) app(p, 8);
+  const bytes = []; for (let i = 0; i < bb.length; i += 8) { let x = 0; for (let j = 0; j < 8; j++) x = (x << 1) | bb[i + j]; bytes.push(x); }
+  const mul = (x, y) => { let z = 0; for (let i = 7; i >= 0; i--) { z = (z << 1) ^ ((z >>> 7) * 0x11D); z ^= ((y >>> i) & 1) * x; } return z; };
+  const divisor = deg => { const r = new Array(deg).fill(0); r[deg - 1] = 1; let root = 1; for (let i = 0; i < deg; i++) { for (let j = 0; j < r.length; j++) { r[j] = mul(r[j], root); if (j + 1 < r.length) r[j] ^= r[j + 1]; } root = mul(root, 0x02); } return r; };
+  const remainder = (d, div) => { const r = div.map(() => 0); for (const b of d) { const f = b ^ r.shift(); r.push(0); div.forEach((c, i) => { r[i] ^= mul(c, f); }); } return r; };
+  const nb = NB[ver], ecl = ECC[ver], raw = Math.floor(rawMods(ver) / 8), nShort = nb - raw % nb, shortLen = Math.floor(raw / nb), div = divisor(ecl), blocks = [];
+  for (let i = 0, k = 0; i < nb; i++) { const dat = bytes.slice(k, k + shortLen - ecl + (i < nShort ? 0 : 1)); k += dat.length; const ec = remainder(dat, div); if (i < nShort) dat.push(0); blocks.push(dat.concat(ec)); }
+  const res = []; for (let i = 0; i < blocks[0].length; i++) blocks.forEach((b, j) => { if (i !== shortLen - ecl || j >= nShort) res.push(b[i]); });
+  const size = ver * 4 + 17, M = [...Array(size)].map(() => Array(size).fill(false)), F = [...Array(size)].map(() => Array(size).fill(false));
+  const set = (x, y, v) => { M[y][x] = v; F[y][x] = true; };
+  for (let i = 0; i < size; i++) { set(6, i, i % 2 === 0); set(i, 6, i % 2 === 0); }
+  const finder = (cx, cy) => { for (let dy = -4; dy <= 4; dy++) for (let dx = -4; dx <= 4; dx++) { const d = Math.max(Math.abs(dx), Math.abs(dy)), x = cx + dx, y = cy + dy; if (x >= 0 && x < size && y >= 0 && y < size) set(x, y, d !== 2 && d !== 4); } };
+  finder(3, 3); finder(size - 4, 3); finder(3, size - 4);
+  const ap = []; if (ver > 1) { const n = Math.floor(ver / 7) + 2, step = Math.floor((ver * 8 + n * 3 + 5) / (n * 4 - 4)) * 2; ap.push(6); for (let pos = size - 7; ap.length < n; pos -= step) ap.splice(1, 0, pos); }
+  ap.forEach((x, i) => ap.forEach((y, j) => { if ((i === 0 && j === 0) || (i === 0 && j === ap.length - 1) || (i === ap.length - 1 && j === 0)) return; for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) set(x + dx, y + dy, Math.max(Math.abs(dx), Math.abs(dy)) !== 1); }));
+  const drawFormat = mask => {
+    const d = (0 << 3) | mask; let rem = d; for (let i = 0; i < 10; i++) rem = (rem << 1) ^ ((rem >>> 9) * 0x537);
+    const bits = ((d << 10) | rem) ^ 0x5412, g = i => ((bits >>> i) & 1) === 1;
+    for (let i = 0; i <= 5; i++) set(8, i, g(i)); set(8, 7, g(6)); set(8, 8, g(7)); set(7, 8, g(8)); for (let i = 9; i < 15; i++) set(14 - i, 8, g(i));
+    for (let i = 0; i < 8; i++) set(size - 1 - i, 8, g(i)); for (let i = 8; i < 15; i++) set(8, size - 15 + i, g(i)); set(8, size - 8, true);
+  };
+  drawFormat(0);
+  if (ver >= 7) { let rem = ver; for (let i = 0; i < 12; i++) rem = (rem << 1) ^ ((rem >>> 11) * 0x1F25); const bits = (ver << 12) | rem; for (let i = 0; i < 18; i++) { const b = ((bits >>> i) & 1) === 1, a = size - 11 + i % 3, c = Math.floor(i / 3); set(a, c, b); set(c, a, b); } }
+  let bi = 0;
+  for (let right = size - 1; right >= 1; right -= 2) { if (right === 6) right = 5; for (let vert = 0; vert < size; vert++) for (let j = 0; j < 2; j++) { const x = right - j, up = ((right + 1) & 2) === 0, y = up ? size - 1 - vert : vert; if (!F[y][x] && bi < res.length * 8) { M[y][x] = ((res[bi >>> 3] >>> (7 - (bi & 7))) & 1) === 1; bi++; } } }
+  const MF = [(x, y) => (x + y) % 2 === 0, (x, y) => y % 2 === 0, (x, y) => x % 3 === 0, (x, y) => (x + y) % 3 === 0, (x, y) => (Math.floor(x / 3) + Math.floor(y / 2)) % 2 === 0, (x, y) => x * y % 2 + x * y % 3 === 0, (x, y) => (x * y % 2 + x * y % 3) % 2 === 0, (x, y) => ((x + y) % 2 + x * y % 3) % 2 === 0];
+  const applyMask = k => { for (let y = 0; y < size; y++) for (let x = 0; x < size; x++) if (!F[y][x] && MF[k](x, y)) M[y][x] = !M[y][x]; };
+  const penalty = () => {
+    let p = 0, dark = 0;
+    for (let y = 0; y < size; y++) { let run = 1; for (let x = 1; x < size; x++) { if (M[y][x] === M[y][x - 1]) { run++; if (run === 5) p += 3; else if (run > 5) p++; } else run = 1; } }
+    for (let x = 0; x < size; x++) { let run = 1; for (let y = 1; y < size; y++) { if (M[y][x] === M[y - 1][x]) { run++; if (run === 5) p += 3; else if (run > 5) p++; } else run = 1; } }
+    for (let y = 0; y < size - 1; y++) for (let x = 0; x < size - 1; x++) { const c = M[y][x]; if (c === M[y][x + 1] && c === M[y + 1][x] && c === M[y + 1][x + 1]) p += 3; }
+    M.forEach(r => r.forEach(c => { if (c) dark++; })); p += Math.floor(Math.abs(dark * 20 - size * size * 10) / (size * size)) * 10;
+    return p;
+  };
+  let best = 0, bestP = Infinity;
+  for (let k = 0; k < 8; k++) { applyMask(k); drawFormat(k); const p = penalty(); if (p < bestP) { bestP = p; best = k; } applyMask(k); }
+  applyMask(best); drawFormat(best);
+  return M;
+}
+function qrCanvas(text, px) {
+  const M = qrMatrix(text), n = M.length, q = 4, s = Math.max(2, Math.floor((px || 260) / (n + 2 * q)));
+  const c = document.createElement('canvas'); c.width = c.height = (n + 2 * q) * s;
+  const g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.fillStyle = '#000';
+  M.forEach((r, y) => r.forEach((v, x) => { if (v) g.fillRect((x + q) * s, (y + q) * s, s, s); }));
+  c.style.cssText = 'width:100%;max-width:' + c.width + 'px;image-rendering:pixelated;display:block;margin:0 auto'; return c;
+}
+
+/* 2.49: pedir o consentimento RGPD e os dados em falta por WhatsApp (link pessoal, válido 30 dias) */
+function demoFalta(a) { const L = (DEMO.locais || []).find(l => l.id === a.local_id) || {}; return { rgpd: !RGPD_OK.includes(a.rgpd_estado) && a.rgpd_estado !== 'recusado', rgpdEspaco: L.rgpd_local === 'sim', contacto: !a.contacto, nasc: !/^\d{4}-\d\d-\d\d$/.test(a.data_nascimento || '') }; }
+const faltaTxt = f => [f.rgpd && !f.rgpdEspaco ? 'consentimento RGPD' : '', f.contacto ? 'contacto' : '', f.nasc ? 'data de nascimento' : ''].filter(Boolean);
+function faltaLocal(a) {
+  const f = { rgpd: semRgpdA(a), contacto: isGestor() ? !a.contacto : false, nasc: !a.aniv && !a.data_nascimento };
+  return f.rgpd || f.contacto || f.nasc ? f : null;
+}
+function telWa(t) { let d = String(t || '').replace(/\D/g, ''); if (d.startsWith('00')) d = d.slice(2); if (d.length === 9 && /^[29]/.test(d)) d = '351' + d; return d; }
+async function pedirWhatsApp(a) {
+  let r; try { r = await API.convite(a.id); } catch (e) { toast(e.server ? e.message : 'Sem ligação: o pedido precisa de internet.'); return; }
+  const url = location.origin + location.pathname.replace(/index\.html$/, '') + '#rgpd=' + r.token, falta = faltaTxt(r.falta);
+  const L = localById(a.local_id) || {}, pn = firstName(a.nome);
+  const msg = (r.crianca ? `Olá! Sou ${firstName(S.me.nome)}, da SGArtes (aulas de dança em ${L.nome || 'o seu centro'}). Para registarmos as aulas de ${pn}, pedimos ao encarregado de educação que confirme ` : `Olá ${pn}! Sou ${firstName(S.me.nome)}, da SGArtes (aulas de dança em ${L.nome || 'o seu centro'}). Para registarmos as aulas, pedimos que confirme `)
+    + (falta.length ? falta.join(', ').replace(/, ([^,]*)$/, ' e $1') : 'os seus dados') + ' neste link (demora 1 minuto, não precisa de assinar):\n' + url + '\nObrigado!';
+  const tel = h('input', { class: 'in', type: 'tel', inputmode: 'tel', placeholder: 'Telemóvel (ex.: 912 345 678)', value: r.contacto || '' });
+  const qrBox = h('div');
+  const s = openSheet('Pedir por WhatsApp',
+    h('p', { class: 'mut cap', style: 'margin-top:0' }, `${a.nome} · falta: ${falta.length ? falta.join(', ') : 'nada (pode confirmar na mesma)'}`),
+    h('label', { class: 'l' }, r.contacto ? 'Número para onde enviar' : 'Número para onde enviar (do aluno ou de um familiar)'), tel,
+    !r.contacto && r.temContacto ? h('p', { class: 'mut cap', style: 'margin:6px 0 0' }, 'O aluno tem contacto registado, mas só o gestor o vê. Escreve o número, usa o QR code ou partilha a mensagem.') : null,
+    h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: () => {
+      const n = telWa(tel.value); if (n.length < 11) { toast('Escreve o número de telemóvel.'); tel.focus(); return; }
+      window.open('https://wa.me/' + n + '?text=' + encodeURIComponent(msg), '_blank'); } }, '📲 Abrir WhatsApp com a mensagem'),
+    h('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: () => { qrBox.replaceChildren(h('div', { class: 'card', style: 'margin-top:10px;text-align:center' }, qrCanvas(url, 280), h('p', { class: 'cap', style: 'margin:8px 0 0' }, 'A pessoa aponta a câmara do telemóvel dela para este código.'))); } }, '▦ Mostrar QR code (sem número)'),
+    h('button', { class: 'btn ghost', style: 'margin-top:8px', onclick: async () => { try { if (navigator.share) await navigator.share({ text: msg }); else { await navigator.clipboard.writeText(msg); toast('Mensagem copiada.'); } } catch (e) { } } }, '🔗 Partilhar ou copiar'),
+    qrBox, h('p', { class: 'mut cap' }, 'O link é pessoal e vale 30 dias. A resposta (aceito/não aceito, contacto e data de nascimento) entra logo na ficha e fica registada com data e texto do consentimento.'));
+  return s;
+}
+function pendentesModal(localId) {
+  const rows = S.d.alunos.filter(a => a.ativo !== 'nao' && a.rgpd_estado !== 'eliminado' && (!localId || a.local_id === localId)).map(a => ({ a, f: faltaLocal(a) })).filter(x => x.f).sort((x, y) => byName(x.a, y.a));
+  openSheet('Pedir RGPD e dados em falta', h('p', { class: 'mut cap', style: 'margin-top:0' }, `${rows.length} aluno(s)${localId ? ' em ' + ((localById(localId) || {}).nome || '') : ''} com RGPD por assinar ou dados em falta. Toca para enviar o pedido.`),
+    h('div', { class: 'card', style: 'padding:6px 14px' }, ...(rows.length ? rows.map(({ a, f }) => h('button', { class: 'row', style: 'width:100%;background:none;border:0;text-align:left;border-bottom:1px solid var(--line)', onclick: () => pedirWhatsApp(a) },
+      avatar(a), h('div', { class: 'grow' }, h('b', {}, a.nome), h('div', { class: 'mut cap' }, faltaTxt(f).join(' · ') + (a.contacto ? '' : isGestor() ? ' · sem número' : ''))), h('span', { class: 'mut' }, '📲'))) : [h('p', { class: 'mut' }, 'Está tudo em dia. 🎉')])));
+}
+/* página pública do link: a pessoa confirma o consentimento e completa os dados (sem entrar na app) */
+async function renderConvite(tk) {
+  const app = $('#app');
+  const wrap = h('div', { style: 'max-width:520px;margin:0 auto;padding:22px 18px 40px' }, h('div', { style: 'display:flex;align-items:center;gap:12px;margin-bottom:14px' }, h('img', { src: LOGO, alt: 'SGArtes', style: 'height:44px' }), h('b', { style: 'font-size:17px' }, 'Consentimento e dados')));
+  const corpo = h('div', {}, h('p', { class: 'mut' }, 'A abrir…')); wrap.append(corpo); app.replaceChildren(wrap);
+  let r; try { r = await API.conviteVer(tk); } catch (e) { corpo.replaceChildren(h('div', { class: 'card' }, h('p', {}, e.server ? e.message : 'Sem ligação. Confirme que tem internet e abra o link outra vez.'))); return; }
+  if (r.fechado) { corpo.replaceChildren(h('div', { class: 'card' }, h('p', { style: 'margin:0' }, r.fechado))); return; }
+  const f = r.falta, pedeRgpd = f.rgpd && !f.rgpdEspaco;
+  let dec = '';
+  const quem = h('input', { class: 'in', placeholder: 'Nome do encarregado de educação', autocomplete: 'name' });
+  const tel = h('input', { class: 'in', type: 'tel', inputmode: 'tel', placeholder: 'ex.: 912 345 678', autocomplete: 'tel' });
+  const dn = h('input', { class: 'in', type: 'date', max: today() });
+  const bA = h('button', { class: 'btn ghost', type: 'button', onclick: () => pick('aceito') }, '✓ Aceito'), bR = h('button', { class: 'btn ghost', type: 'button', onclick: () => pick('recusado') }, 'Não aceito');
+  const pick = v => { dec = v; bA.className = 'btn ' + (v === 'aceito' ? 'primary' : 'ghost'); bR.className = 'btn ' + (v === 'recusado' ? 'primary' : 'ghost'); };
+  const erro = h('p', { style: 'color:#b3261e;font-weight:600;min-height:1em' });
+  const partes = [h('h1', { style: 'font-size:22px;margin:0 0 6px' }, r.crianca ? `Aulas de ${r.nome}` : `Olá, ${r.nome}!`),
+    h('p', { class: 'mut', style: 'margin-top:0' }, `Aulas de dança da SGArtes${r.local ? ' em ' + r.local : ''}.` + (r.crianca ? ' Este pedido é para o encarregado de educação.' : ''))];
+  if (pedeRgpd) partes.push(h('div', { class: 'card', style: 'margin-top:12px' }, h('b', {}, 'Consentimento (RGPD)'), h('p', { style: 'margin:8px 0 12px;line-height:1.5' }, r.texto),
+    r.crianca ? [h('label', { class: 'l' }, 'Nome do encarregado de educação'), quem] : null,
+    h('div', { style: 'display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px' }, bA, bR),
+    h('p', { class: 'mut cap', style: 'margin:10px 0 0' }, 'Se não aceitar, continua a ter aulas normalmente, mas não aparece nas fotografias publicadas.')));
+  else if (f.rgpdEspaco && f.rgpd) partes.push(h('p', { class: 'mut cap' }, 'O consentimento de imagem já está coberto pelo regulamento do espaço onde tem as aulas.'));
+  if (f.contacto || f.nasc) partes.push(h('div', { class: 'card', style: 'margin-top:12px' }, h('b', {}, 'Os seus dados'), h('p', { class: 'mut cap', style: 'margin:4px 0 6px' }, 'Só a SGArtes os vê. Servem para o contactar sobre as aulas e para os aniversários.'),
+    f.contacto ? [h('label', { class: 'l' }, 'Telemóvel'), tel] : null, f.nasc ? [h('label', { class: 'l' }, 'Data de nascimento'), dn] : null));
+  if (!pedeRgpd && !f.contacto && !f.nasc) { corpo.replaceChildren(...partes, h('div', { class: 'card', style: 'margin-top:12px' }, h('p', { style: 'margin:0' }, 'Está tudo em dia. Obrigado!'))); return; }
+  const enviar = h('button', { class: 'btn primary', style: 'margin-top:16px', onclick: async () => {
+    erro.textContent = '';
+    if (pedeRgpd && !dec) { erro.textContent = 'Escolha «Aceito» ou «Não aceito».'; return; }
+    if (pedeRgpd && r.crianca && quem.value.trim().length < 3) { erro.textContent = 'Escreva o nome do encarregado de educação.'; return; }
+    enviar.disabled = true; enviar.textContent = 'A enviar…';
+    try {
+      const x = await API.conviteResponder(tk, { decisao: dec, quem: quem.value.trim(), contacto: tel.value.trim(), data_nascimento: dn.value, ua: navigator.userAgent });
+      corpo.replaceChildren(h('div', { class: 'card', style: 'text-align:center;padding:24px' }, h('div', { style: 'font-size:42px' }, '✅'), h('h2', { style: 'margin:6px 0' }, 'Obrigado!'),
+        h('p', { class: 'mut', style: 'margin:0' }, (x.rgpd === 'digital' ? 'O seu consentimento ficou registado. ' : x.rgpd === 'recusado' ? 'Ficou registado que não aceita. ' : '') + (x.dados ? 'Os seus dados foram guardados. ' : '') + 'Pode fechar esta página.')));
+    } catch (e) { erro.textContent = e.server ? e.message : 'Sem ligação. Tente outra vez.'; enviar.disabled = false; enviar.textContent = 'Confirmar'; }
+  } }, 'Confirmar');
+  corpo.replaceChildren(...partes, erro, enviar, h('p', { class: 'mut cap', style: 'margin-top:16px' }, 'SGArtes – Associação Cultural · Pode retirar o consentimento a qualquer momento junto da SGArtes.'));
+}
 function novoAlunoFlow(paint) {
   const f = S.flow;
   alunoModal(null, { localId: f.local.id, grupoId: f.g.id, fixed: true, onSave: a => { f.novos.push(a); f.order.push(a.id); f.marks[a.id] = true; f.history.push(a.id); paint(); toast(`${firstName(a.nome)} adicionado(a) e marcado(a) presente`); } });
 }
 
-const RGPD_OK = ['assinado', 'testemunhado'];
+const RGPD_OK = ['assinado', 'testemunhado', 'digital']; /* 2.49: digital = confirmado pela própria pessoa por link */
 function rgpdText(crianca, temFoto) {
   return (crianca ? 'Autorizo, como encarregado(a) de educação, ' : 'Autorizo ') + 'a SGArtes a tratar estes dados apenas para gerir as aulas. ' +
     (crianca ? 'Não é guardada fotografia individual do menor. ' : '') +
@@ -1428,7 +1581,7 @@ function alunoModal(a, opt) {
   const rgpdBox = h('div', { class: 'card', style: 'margin-top:14px' });
   let rgpdModo = d.rgpd_estado === 'recusado' ? 'recusado' : d.rgpd_estado === 'pendente' ? 'depois' : 'agora', rgpdConf = false, rgpdInd = false, rgpdLoc = opt.fixed ? opt.localId : d.local_id;
   const paintRgpd = () => {
-    if (RGPD_OK.includes(d.rgpd_estado)) { rgpdBox.replaceChildren(h('div', { class: 'row-between' }, h('b', {}, 'Consentimento RGPD'), h('span', { class: 'chip ok' }, (d.rgpd_estado === 'testemunhado' ? '✓ Confirmado por testemunha' : '✓ Assinado') + (d.rgpd_data ? ' ' + fmtShort(d.rgpd_data) : '')))); return; }
+    if (RGPD_OK.includes(d.rgpd_estado)) { rgpdBox.replaceChildren(h('div', { class: 'row-between' }, h('b', {}, 'Consentimento RGPD'), h('span', { class: 'chip ok' }, (d.rgpd_estado === 'testemunhado' ? '✓ Confirmado por testemunha' : d.rgpd_estado === 'digital' ? '✓ Confirmado por link' : '✓ Assinado') + (d.rgpd_data ? ' ' + fmtShort(d.rgpd_data) : '')))); return; }
     rgpdSig = null;
     if (!rgpdInd && d.rgpd_estado !== 'recusado' && rgpdEspaco(rgpdLoc)) {
       const L = localById(rgpdLoc) || {};
@@ -1486,6 +1639,7 @@ function alunoModal(a, opt) {
     opt.fixed ? null : [h('label', { class: 'l' }, 'Local'), localSel, h('label', { class: 'l' }, 'Grupo'), grupoSel],
     seeData ? h('details', { style: 'margin-top:14px', open: a ? null : true /* 2.46: aluno novo = aberto, para não esquecer */ }, h('summary', { style: 'font-weight:700;padding:8px 0' }, 'Contacto e data de nascimento (podem ficar para depois)'), h('label', { class: 'l' }, 'Contacto'), contacto, h('label', { class: 'l' }, 'Data de nascimento'), nasc, a ? null : h('p', { class: 'mut cap' }, 'Depois de guardados, só o gestor os vê. O professor recebe apenas o aviso de aniversário.')) : null,
     rgpdBox,
+    a && !isFunc() && faltaLocal(a) ? h('button', { class: 'btn ghost', type: 'button', style: 'margin-top:10px', onclick: () => pedirWhatsApp(a) }, '📲 Pedir RGPD / dados por WhatsApp') : null,
     a ? [h('label', { class: 'l' }, 'Estado'), ativo] : null,
     h('button', { class: 'btn primary', style: 'margin-top:18px', onclick: async () => {
       if (nome.value.trim().length < 3) { toast('Escreve o nome completo.'); return; }
@@ -2321,7 +2475,8 @@ function viewAlunos() {
   const sel = localPick({ all: true, onchange: e => { st.localId = e.target.value; paint(); } }); sel.value = st.localId;
   el.append(h('h1', {}, 'Alunos'),
     h('button', { class: 'btn primary', onclick: () => alunoModal(null, { localId: st.localId, onSave: saveAlunoEdit }) }, '＋ Novo aluno'), h('div', { style: 'height:8px' }),
-    h('button', { class: 'btn ghost', onclick: () => folhaTurmaModal(st.localId) }, '📋 Folha mensal da turma'), h('div', { style: 'height:12px' }), sel, h('div', { style: 'height:8px' }),
+    h('button', { class: 'btn ghost', onclick: () => folhaTurmaModal(st.localId) }, '📋 Folha mensal da turma'), h('div', { style: 'height:8px' }),
+    h('button', { class: 'btn ghost', onclick: () => pendentesModal(st.localId) }, `📲 Pedir RGPD e dados em falta (${S.d.alunos.filter(a => a.ativo !== 'nao' && (!st.localId || a.local_id === st.localId) && faltaLocal(a)).length})`), h('div', { style: 'height:12px' }), sel, h('div', { style: 'height:8px' }),
     h('input', { class: 'in', placeholder: 'Procurar por nome', value: st.q, oninput: e => { st.q = e.target.value; paint(); } }),
     h('div', { class: 'tools', style: 'justify-content:flex-start;margin:10px 0 0' }, h('button', { class: 'pill' + (st.semRgpd ? ' on' : ''), onclick: () => { st.semRgpd = !st.semRgpd; render(); } }, `🔏 Só sem RGPD (${S.d.alunos.filter(a => a.ativo !== 'nao' && semRgpdA(a)).length})`)), h('div', { style: 'height:12px' }), list);
   paint(); return el;
@@ -2661,6 +2816,7 @@ async function refreshData(force) {
 }
 async function main() {
   S.collapse = await kv.get('collapse', {}); S.queue = await kv.get('queue', []); S.recent = await kv.get('recent', []);
+  if (/^#rgpd=[a-f0-9]{20}$/.test(location.hash)) { if (!IS_GS && !DEMO) DEMO = (await kv.get('demo', null)) || seedDemo(); renderConvite(location.hash.slice(6)); return; } /* 2.49 */
   if (IS_GS && /^#entrar=/.test(location.hash)) {
     /* 2.36: link de entrada do funcionário (enviado pelo gestor por WhatsApp) */
     const tk = location.hash.slice(8); try { history.replaceState(null, '', location.pathname + location.search); } catch (e) { }
@@ -2688,8 +2844,9 @@ async function main() {
     document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { flush(); refreshData(); } });
   }
 }
+window.addEventListener('hashchange', () => { if (/^#rgpd=[a-f0-9]{20}$/.test(location.hash)) location.reload(); }); /* 2.49 */
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.48';
+const BUILD = 'v2.49';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
