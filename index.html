@@ -439,6 +439,21 @@ const API = {
     if (patch.observacoes !== undefined) a.observacoes = patch.observacoes;
     await kv.set('demo', DEMO); return { ok: true, aula: Object.assign({}, a) };
   },
+  async alunosProjeto(localId) {
+    if (IS_GS) return gs('apiAlunosProjeto', localId);
+    const L = DEMO.locais.find(l => l.id === localId) || {}, ln = id => (DEMO.locais.find(l => l.id === id) || {}).nome || '', gn = id => (DEMO.grupos.find(g => g.id === id) || {}).nome || '';
+    return { ok: true, alunos: DEMO.alunos.filter(a => a.ativo !== 'nao' && (DEMO.locais.find(l => l.id === a.local_id) || {}).projeto_id === L.projeto_id).map(a => Object.assign(demoAluno(a), { local_nome: ln(a.local_id), grupo_nome: gn(a.grupo_id) })) };
+  },
+  async folhaTurma(grupoId, mes) {
+    if (IS_GS) return gs('apiFolhaTurma', grupoId, mes);
+    const G = id => DEMO.grupos.find(g => g.id === id) || {}, Lo = id => DEMO.locais.find(l => l.id === id) || {}, A = id => DEMO.alunos.find(a => a.id === id), g = G(grupoId), loc = Lo(g.local_id);
+    const doMes = DEMO.aulas.filter(a => String(a.data).slice(0, 7) === mes && a.estado !== 'anulada'), aulas = doMes.filter(a => a.grupo_id === grupoId).sort((x, y) => (x.data + x.hora_inicio) < (y.data + y.hora_inicio) ? -1 : 1);
+    const linhas = {}, ordem = [], linha = id => { if (linhas[id]) return linhas[id]; const a = A(id) || { id, nome: '(aluno removido)' }; const r = { id, nome: a.nome, foto_mini: a.crianca === 'sim' ? '' : (a.foto_mini || ''), da_turma: a.grupo_id === grupoId || (!a.grupo_id && a.local_id === g.local_id), origem: a.grupo_id === grupoId || (!a.grupo_id && a.local_id === g.local_id) ? '' : [G(a.grupo_id).nome || 'sem turma', Lo(a.local_id).nome].filter(Boolean).join(' · '), cel: aulas.map(() => null), fora: [], total: 0 }; linhas[id] = r; ordem.push(id); return r; };
+    DEMO.alunos.forEach(a => { if (a.grupo_id === grupoId && a.ativo !== 'nao') linha(a.id); });
+    doMes.forEach(au => (au.presencas || []).forEach(x => { const i = aulas.indexOf(au); if (i >= 0) { const r = linha(x.alunoId); r.cel[i] = { p: !!x.presente, e: x.etiqueta || '' }; if (x.presente) r.total++; } else if (x.presente && (A(x.alunoId) || {}).grupo_id === grupoId) linha(x.alunoId).fora.push({ data: au.data, turma: G(au.grupo_id).nome || '', local: Lo(au.local_id).nome || '', e: x.etiqueta || '' }); }));
+    const rows = ordem.map(id => linhas[id]).filter(r => (A(r.id) || {}).grupo_id === grupoId || r.cel.some(Boolean)).sort((x, y) => (x.da_turma === y.da_turma ? 0 : x.da_turma ? -1 : 1) || x.nome.localeCompare(y.nome));
+    return { ok: true, mes, turma: { id: g.id, nome: g.nome, local: loc.nome || '', projeto: ((DEMO.projetos || []).find(p => p.id === loc.projeto_id) || {}).nome || '', professor: ((DEMO.professores || []).find(p => p.id === g.professor_id) || {}).nome || '', dia: g.dia, hora: g.hora_inicio }, aulas: aulas.map(a => ({ id: a.id, data: a.data, hora: a.hora_inicio })), alunos: rows };
+  },
   async presencas(id) {
     if (IS_GS) return gs('apiPresencas', id);
     const a = DEMO.aulas.find(z => z.id === id) || {}; return { ok: true, presencas: (a.presencas || []).map(x => Object.assign({ nome: (DEMO.alunos.find(z => z.id === x.alunoId) || {}).nome }, x)) };
@@ -576,7 +591,7 @@ const grupoById = id => S.d.grupos.find(g => g.id === id);
 const localById = id => S.d.locais.find(l => l.id === id);
 const projById = id => S.d.projetos.find(p => p.id === id);
 const profById = id => S.d.professores.find(p => p.id === id);
-const alunoById = id => S.d.alunos.find(a => a.id === id) || (S.flow && (S.flow.novos.find(a => a.id === id) || (S.temp[S.flow.g.id] || []).find(a => a.id === id)));
+const alunoById = id => S.d.alunos.find(a => a.id === id) || (S.flow && (S.flow.novos.find(a => a.id === id) || (S.flow.visitas || []).find(a => a.id === id) || (S.temp[S.flow.g.id] || []).find(a => a.id === id)));
 const isGestor = () => !!(S.me && S.me.papel === 'gestor');
 const isFunc = () => !!(S.me && S.me.papel === 'funcionario');
 const effProf = (g, date) => { const a = S.d.atrib.find(x => x.grupo_id === g.id && String(x.data) === date); return a ? a.professor_id : g.professor_id; };
@@ -1168,7 +1183,7 @@ async function startFlow(g, data) {
   if (closedFor(g.id, data) && !(await confirmBox('Evidências já enviadas', 'Já enviaste as evidências desta aula nesse dia. Queres enviar outra vez?', 'Enviar outra vez'))) return;
   const local = localById(g.local_id), proj = projById(local.projeto_id);
   S.flow = { g, local, proj, data, inicio: g.hora_inicio, dur: Number(g.duracao_min) || 60, subst: g.professor_id !== S.me.id, step: 1, lista: g.com_lista === 'sim',
-    marks: {}, order: [], cursor: 0, history: [], homens: 0, mulheres: 0, novos: [], fotos: [], obs: '', resp: '', assinR: null, assinP: null, gps: null, saving: false, later: data < today() };
+    marks: {}, order: [], cursor: 0, history: [], homens: 0, mulheres: 0, novos: [], fotos: [], obs: '', resp: '', assinR: null, assinP: null, gps: null, saving: false, later: data < today(), etiq: {}, visitas: [] };
   S.flow.confirmP = false; S.flow.q = '';
   if (S.flow.lista && IS_GS && !isGestor() && g.professor_id !== S.me.id && !S.temp[g.id]) {
     try { S.temp[g.id] = (await API.roster(g.id)).alunos || []; }
@@ -1263,11 +1278,12 @@ function deckUI(paint) {
         const v = f.marks[a.id];
         return h('button', { type: 'button', 'aria-pressed': v === true ? 'true' : 'false', style: `border:3px solid ${v === true ? 'var(--ok)' : v === false ? 'var(--bad-l)' : 'var(--line)'};background:${v === true ? 'var(--ok-l)' : '#fff'};border-radius:16px;padding:10px 4px;display:flex;flex-direction:column;align-items:center;gap:6px;font-size:13px;font-weight:600;color:var(--ink);opacity:${v === false ? '.55' : '1'}`,
           onclick: () => { if (v === true) delete f.marks[a.id]; else { f.marks[a.id] = true; f.history.push(a.id); } paint(); } },
-          avatar(a), h('span', { style: 'text-align:center;line-height:1.2' }, a.nome.split(' ').filter(Boolean).slice(0, 2).join(' ')), semRgpdA(a) ? h('span', { class: 'chip rgpd', style: 'font-size:11px;padding:2px 8px' }, 'RGPD por assinar') : null, v === true ? h('span', { class: 'chip ok' }, '✓ Veio') : v === false ? h('span', { class: 'chip bad' }, 'Faltou') : null);
+          avatar(a), h('span', { style: 'text-align:center;line-height:1.2' }, a.nome.split(' ').filter(Boolean).slice(0, 2).join(' ')), semRgpdA(a) ? h('span', { class: 'chip rgpd', style: 'font-size:11px;padding:2px 8px' }, 'RGPD por assinar') : null, etiqChip(a.id), v === true ? h('span', { class: 'chip ok' }, '✓ Veio') : v === false ? h('span', { class: 'chip bad' }, 'Faltou') : null);
       })),
       h('div', { class: 'tools', style: 'margin-top:12px;gap:8px;flex-wrap:wrap' },
         resto.length ? h('button', { class: 'btn ghost small', onclick: () => { resto.forEach(id => { f.marks[id] = false; }); f.history.push(resto); paint(); } }, `Os restantes ${resto.length} faltaram`) : null,
-        h('button', { class: 'btn ghost small', onclick: () => novoAlunoFlow(paint) }, '＋ Novo aluno')),
+        h('button', { class: 'btn ghost small', onclick: () => novoAlunoFlow(paint) }, '＋ Novo aluno'),
+        h('button', { class: 'btn ghost small', onclick: () => visitaFlow(paint) }, '＋ De outra turma')),
       troca);
     return wrap;
   }
@@ -1279,7 +1295,7 @@ function deckUI(paint) {
     if (card) { card.style.transition = 'transform .2s'; card.style.transform = `translateX(${val ? 520 : -520}px) rotate(${val ? 18 : -18}deg)`; setTimeout(done, 170); } else done();
   };
   if (!list.length) {
-    wrap.append(h('div', { class: 'card', style: 'text-align:center;margin-top:12px' }, h('p', {}, 'Este grupo ainda não tem alunos.'), h('button', { class: 'btn primary', onclick: () => novoAlunoFlow(paint) }, '＋ Novo aluno')));
+    wrap.append(h('div', { class: 'card', style: 'text-align:center;margin-top:12px' }, h('p', {}, 'Este grupo ainda não tem alunos.'), h('button', { class: 'btn primary', onclick: () => novoAlunoFlow(paint) }, '＋ Novo aluno'), h('div', { style: 'height:8px' }), h('button', { class: 'btn ghost', onclick: () => visitaFlow(paint) }, '＋ Aluno de outra turma')));
   } else if (cur) {
     const res = h('div', { class: 'namechips', style: 'margin-top:6px' });
     const qIn = h('input', { class: 'in', placeholder: '🔎 Chegou alguém? Procura o nome', value: f.q || '', style: 'margin-top:10px;min-height:46px', oninput: e => { f.q = e.target.value; paintRes(); } });
@@ -1288,7 +1304,7 @@ function deckUI(paint) {
       res.replaceChildren(...(q.length < 2 ? [] : list.filter(a => f.marks[a.id] === undefined && a.nome.toLowerCase().includes(q)).slice(0, 6).map(a => h('button', { class: 'namechip', onclick: () => { f.marks[a.id] = true; f.history.push(a.id); f.q = ''; paint(); } }, '✓ ' + a.nome))));
     };
     paintRes(); wrap.append(qIn, res);
-    const card = h('div', { class: 'sw', 'data-dir': '' }, avatar(cur, true), h('div', { class: 'nm' }, cur.nome), semRgpdA(cur) ? h('span', { class: 'chip rgpd' }, 'RGPD por assinar') : null, h('div', { class: 'hint' }, '‹ desliza: faltou · veio: desliza ›'));
+    const card = h('div', { class: 'sw', 'data-dir': '' }, avatar(cur, true), h('div', { class: 'nm' }, cur.nome), etiqChip(cur.id), semRgpdA(cur) ? h('span', { class: 'chip rgpd' }, 'RGPD por assinar') : null, h('div', { class: 'hint' }, '‹ desliza: faltou · veio: desliza ›'));
     attachSwipe(card, v => decide(v, card));
     wrap.append(h('div', { class: 'deck' }, card),
       h('div', { class: 'decide' }, h('button', { class: 'btn bad', onclick: () => decide(false, card) }, '✗ Faltou'), h('button', { class: 'btn ok', onclick: () => decide(true, card) }, '✓ Veio')));
@@ -1306,6 +1322,7 @@ function deckUI(paint) {
       f.cursor = Math.max(0, list.findIndex(a => a.id === ids[0])); paint();
     } }, '↶ Desfazer'),
     h('button', { class: 'btn ghost small', onclick: () => novoAlunoFlow(paint) }, '＋ Novo aluno'),
+    h('button', { class: 'btn ghost small', onclick: () => visitaFlow(paint) }, '＋ De outra turma'),
     cur ? h('button', { class: 'btn ghost small', onclick: () => { const ids = list.filter(a => f.marks[a.id] === undefined).map(a => a.id); ids.forEach(id => { f.marks[id] = true; }); f.history.push(ids); paint(); } }, 'Todos presentes') : null),
     h('div', { class: 'tools' }, h('button', { class: 'link', onclick: async () => {
       if (!(await confirmBox('Só contar', 'Este grupo passa a registar apenas o número de homens e mulheres.', 'Só contar'))) return;
@@ -1331,6 +1348,42 @@ function attachSwipe(card, onDecide) {
     else { card.style.transition = 'transform .18s'; card.style.transform = ''; card.dataset.dir = ''; }
   };
   card.addEventListener('pointerup', end); card.addEventListener('pointercancel', end);
+}
+/* 2.47: aluno de outra turma do mesmo projeto, presente só nesta aula, com etiqueta (fica registada na presença) */
+const ETIQ = { compensacao: ['🔁', 'Compensação', 'Repõe uma aula que faltou'], troca: ['↔️', 'Troca de turma', 'Hoje veio em vez da sua turma'], visita: ['👋', 'Visita / outro motivo', 'Outro motivo (ex.: vem de outro local)'] };
+function etiqChip(id) { const e = S.flow && (S.flow.etiq || {})[id]; return e && ETIQ[e] ? h('span', { class: 'chip warn', style: 'font-size:11px;padding:2px 8px' }, ETIQ[e][0] + ' ' + ETIQ[e][1]) : null; }
+async function alunosDoProjeto(local) {
+  S.projAl = S.projAl || {}; const k = local.projeto_id;
+  if (S.projAl[k]) return S.projAl[k];
+  const lnome = id => (localById(id) || {}).nome || '', gnome = id => (grupoById(id) || {}).nome || '';
+  const off = () => S.d.alunos.filter(a => a.ativo !== 'nao' && (localById(a.local_id) || {}).projeto_id === k).map(a => Object.assign({}, a, { local_nome: lnome(a.local_id), grupo_nome: gnome(a.grupo_id) }));
+  try { const r = await API.alunosProjeto(local.id); S.projAl[k] = r.alunos || []; return S.projAl[k]; }
+  catch (e) { toast('Sem ligação: mostro só os alunos que já tens no telemóvel.'); return off(); }
+}
+async function visitaFlow(paint) {
+  const f = S.flow, lista = h('div', { class: 'card', style: 'padding:6px 14px;max-height:52vh;overflow:auto' }, h('span', { class: 'mut' }, 'A carregar alunos do projeto…'));
+  const q = h('input', { class: 'in', placeholder: 'Procurar pelo nome', autocomplete: 'off' });
+  const s = openSheet('Aluno de outra turma', h('p', { class: 'mut cap', style: 'margin-top:0' }, 'Alunos do projeto ' + ((f.proj || {}).nome || '') + '. Fica presente só nesta aula; a ficha do aluno não muda.'), q, h('div', { style: 'height:8px' }), lista);
+  const todos = await alunosDoProjeto(f.local);
+  const escolher = a => {
+    const mesmo = a.local_id === f.local.id;
+    s.box.replaceChildren(s.box.firstChild, h('div', { class: 'row', style: 'margin:4px 0 10px' }, avatar(a), h('div', { class: 'grow' }, h('b', {}, a.nome), h('div', { class: 'mut cap' }, [a.grupo_nome || 'sem turma', a.local_nome].filter(Boolean).join(' · ')))),
+      h('h2', { style: 'margin:6px 0 10px' }, 'Porque veio a esta aula?'),
+      ...Object.entries(ETIQ).map(([k, [ic, l, sub]]) => h('button', { class: 'btn ' + ((mesmo ? k === 'compensacao' : k === 'visita') ? 'primary' : 'ghost'), style: 'margin-bottom:8px;text-align:left;display:block;width:100%', onclick: () => {
+        if (!alunoById(a.id)) f.visitas.push(a);
+        if (!f.order.includes(a.id)) f.order.push(a.id);
+        f.marks[a.id] = true; f.etiq[a.id] = k; f.history.push(a.id); s.close(); paint();
+        toast(`${firstName(a.nome)} presente (${l.toLowerCase()})`);
+      } }, h('b', {}, ic + ' ' + l), h('div', { class: 'cap', style: 'font-weight:400;opacity:.8' }, sub))));
+  };
+  const pintar = () => {
+    const t = q.value.trim().toLowerCase();
+    const rows = todos.filter(a => !f.order.includes(a.id) && a.grupo_id !== f.g.id && (!t || a.nome.toLowerCase().includes(t)))
+      .sort((x, y) => (x.local_id === f.local.id ? 0 : 1) - (y.local_id === f.local.id ? 0 : 1) || byName(x, y)).slice(0, 60);
+    lista.replaceChildren(...(rows.length ? rows.map(a => h('button', { class: 'row', style: 'width:100%;background:none;border:0;text-align:left;border-bottom:1px solid var(--line)', onclick: () => escolher(a) },
+      avatar(a), h('div', { class: 'grow' }, h('b', {}, a.nome), h('div', { class: 'mut cap' }, [a.grupo_nome || 'sem turma', a.local_nome].filter(Boolean).join(' · '))))) : [h('p', { class: 'mut' }, t ? 'Nenhum aluno com esse nome no projeto.' : 'Não há outros alunos no projeto.')]));
+  };
+  q.addEventListener('input', pintar); pintar(); setTimeout(() => q.focus(), 60);
 }
 function novoAlunoFlow(paint) {
   const f = S.flow;
@@ -1593,7 +1646,7 @@ async function finish() {
   const payload = {
     idCliente: idc, grupoId: f.g.id, localId: f.local.id, data: f.data, inicio: f.inicio, fim: fromMin(toMin(f.inicio) + f.dur), duracaoMin: f.dur,
     profDeuId: S.me.id, profPrevistoId: f.g.professor_id, substituicao: f.subst ? 'sim' : 'nao', homens: c.h, mulheres: c.m,
-    presencas: f.lista ? f.order.map(id => ({ alunoId: id, presente: f.marks[id] === true })) : [], novosAlunos: f.novos, listaGrupo: f.lista ? 'sim' : 'nao',
+    presencas: f.lista ? f.order.map(id => ({ alunoId: id, presente: f.marks[id] === true, etiqueta: (f.etiq || {})[id] || '' })) : [], novosAlunos: f.novos, listaGrupo: f.lista ? 'sim' : 'nao',
     observacoes: f.obs.trim(), fotos: f.fotos.map(p => p.dataUrl), assinaturaResp: f.later ? null : f.assinR, nomeResp: f.later ? '' : f.resp.trim(), assinaturaProf: (needP || f.modoP === 'nova') ? f.assinP : null, gps: f.gps, tipoSessao: f.tipo || 'aula', semPost, rgpdFora: Object.keys(f.rgpdFora || {}).filter(k => f.rgpdFora[k])
   };
   // atualiza já o que a app sabe localmente
@@ -2247,10 +2300,60 @@ function viewAlunos() {
   };
   const sel = localPick({ all: true, onchange: e => { st.localId = e.target.value; paint(); } }); sel.value = st.localId;
   el.append(h('h1', {}, 'Alunos'),
-    h('button', { class: 'btn primary', onclick: () => alunoModal(null, { localId: st.localId, onSave: saveAlunoEdit }) }, '＋ Novo aluno'), h('div', { style: 'height:12px' }), sel, h('div', { style: 'height:8px' }),
+    h('button', { class: 'btn primary', onclick: () => alunoModal(null, { localId: st.localId, onSave: saveAlunoEdit }) }, '＋ Novo aluno'), h('div', { style: 'height:8px' }),
+    h('button', { class: 'btn ghost', onclick: () => folhaTurmaModal(st.localId) }, '📋 Folha mensal da turma'), h('div', { style: 'height:12px' }), sel, h('div', { style: 'height:8px' }),
     h('input', { class: 'in', placeholder: 'Procurar por nome', value: st.q, oninput: e => { st.q = e.target.value; paint(); } }),
     h('div', { class: 'tools', style: 'justify-content:flex-start;margin:10px 0 0' }, h('button', { class: 'pill' + (st.semRgpd ? ' on' : ''), onclick: () => { st.semRgpd = !st.semRgpd; render(); } }, `🔏 Só sem RGPD (${S.d.alunos.filter(a => a.ativo !== 'nao' && semRgpdA(a)).length})`)), h('div', { style: 'height:12px' }), list);
   paint(); return el;
+}
+/* 2.47: folha de turma por mês (local + turma): foto, nome completo e presenças de cada aula; mostra quem veio de outra turma e quem foi a outra turma */
+function folhaTurmaModal(localId) {
+  const gs_ = S.d.grupos.filter(g => g.ativo !== 'nao' && (isGestor() || g.professor_id === S.me.id) && (!localId || g.local_id === localId))
+    .sort((a, b) => ((localById(a.local_id) || {}).nome || '').localeCompare((localById(b.local_id) || {}).nome || '') || Number(a.dia) - Number(b.dia) || String(a.hora_inicio).localeCompare(String(b.hora_inicio)));
+  if (!gs_.length) { toast('Não tens turmas para mostrar.'); return; }
+  const st = S.ft = Object.assign({ g: gs_[0].id, mes: today().slice(0, 7) }, S.ft || {}); if (!gs_.some(g => g.id === st.g)) st.g = gs_[0].id;
+  const sel = h('select', { class: 'in' }, ...gs_.map(g => h('option', { value: g.id }, `${(localById(g.local_id) || {}).nome || ''} · ${g.nome} · ${DIAS_LONGOS[Number(g.dia)] || ''} ${String(g.hora_inicio || '').slice(0, 5)}`))); sel.value = st.g;
+  const mes = h('input', { class: 'in', type: 'month', value: st.mes });
+  const out = h('div', { style: 'margin-top:12px' });
+  let dados = null;
+  const carregar = async () => {
+    st.g = sel.value; st.mes = mes.value || today().slice(0, 7); out.replaceChildren(h('p', { class: 'mut' }, 'A carregar…'));
+    try { dados = await API.folhaTurma(st.g, st.mes); out.replaceChildren(folhaTurmaTabela(dados, false), h('button', { class: 'btn primary', style: 'margin-top:12px', onclick: () => imprimirFolhaTurma(dados) }, '🖨️ Imprimir / guardar PDF')); }
+    catch (e) { out.replaceChildren(h('p', { class: 'mut' }, e.server === false ? 'Sem ligação: a folha precisa de internet.' : (e.message || 'Erro.'))); }
+  };
+  sel.addEventListener('change', carregar); mes.addEventListener('change', carregar);
+  openSheet('Folha mensal da turma', h('label', { class: 'l' }, 'Turma'), sel, h('label', { class: 'l' }, 'Mês'), mes, out);
+  carregar();
+}
+const ETIQ_LETRA = { compensacao: 'C', troca: 'T', visita: 'V' };
+function folhaTurmaTabela(d, imprimir) {
+  const dm = x => x.slice(8, 10) + '/' + x.slice(5, 7);
+  const th = (t, st) => h('th', { style: 'padding:6px 4px;border-bottom:2px solid #ccc;font-size:12px;text-align:center;white-space:nowrap;' + (st || '') }, t);
+  const cel = c => { const e = c && c.e ? ETIQ_LETRA[c.e] || '' : ''; return h('td', { style: 'text-align:center;padding:4px;border-bottom:1px solid #eee;font-weight:700;color:' + (!c ? '#bbb' : c.p ? '#1f7a45' : '#b3261e') }, !c ? '·' : c.p ? '✓' : 'F', e ? h('sup', { style: 'color:#a05a00;font-size:10px;margin-left:1px' }, e) : null); };
+  const foto = r => r.foto_mini ? h('img', { src: r.foto_mini, alt: '', style: 'width:34px;height:34px;border-radius:50%;object-fit:cover;display:block' }) : h('div', { style: `width:34px;height:34px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;background:${colorFor(r.nome)}` }, initials(r.nome));
+  const linha = r => h('tr', {},
+    h('td', { style: 'padding:4px;border-bottom:1px solid #eee' }, foto(r)),
+    h('td', { style: 'padding:4px 6px;border-bottom:1px solid #eee;min-width:150px' }, h('div', { style: 'font-weight:600' }, r.nome),
+      r.origem ? h('div', { style: 'font-size:11px;color:#a05a00' }, 'De: ' + r.origem) : null,
+      ...(r.fora || []).map(x => h('div', { style: 'font-size:11px;color:#555' }, `↪ ${dm(x.data)} na turma ${x.turma}${x.local ? ' (' + x.local + ')' : ''}${x.e && ETIQ[x.e] ? ' · ' + ETIQ[x.e][1].toLowerCase() : ''}`))),
+    ...r.cel.map(cel), h('td', { style: 'text-align:center;padding:4px;border-bottom:1px solid #eee;font-weight:700' }, String(r.total)));
+  const n = d.aulas.length, proprios = d.alunos.filter(r => r.da_turma), outros = d.alunos.filter(r => !r.da_turma);
+  const sec = t => h('tr', {}, h('td', { colspan: String(n + 3), style: 'padding:10px 4px 4px;font-weight:700;font-size:13px;color:#a05a00' }, t));
+  const tabela = h('table', { style: 'border-collapse:collapse;width:100%;font-size:13px;background:#fff' },
+    h('thead', {}, h('tr', {}, th(''), th('Nome', 'text-align:left'), ...d.aulas.map(a => th(dm(a.data))), th('Total'))),
+    h('tbody', {}, ...proprios.map(linha), outros.length ? sec('Vieram de outras turmas') : null, ...outros.map(linha)));
+  const legenda = h('p', { style: 'font-size:11px;color:#666;margin:8px 0 0' }, '✓ veio · F faltou · · não estava na chamada · C compensação · T troca de turma · V visita. «↪» = foi a outra turma neste mês.');
+  const cab = h('div', { style: 'font-size:13px;margin-bottom:8px' }, h('b', {}, d.turma.nome), ` · ${d.turma.local} · ${d.turma.professor ? 'Prof. ' + d.turma.professor + ' · ' : ''}${mesLongo(d.mes)}`, n ? null : h('div', { class: 'mut' }, 'Ainda não há aulas registadas desta turma neste mês.'));
+  return h('div', {}, cab, h('div', { style: 'overflow-x:auto;-webkit-overflow-scrolling:touch' }, tabela), legenda);
+}
+function mesLongo(ym) { const M = ['janeiro', 'fevereiro', 'março', 'abril', 'maio', 'junho', 'julho', 'agosto', 'setembro', 'outubro', 'novembro', 'dezembro']; return M[Number(ym.slice(5, 7)) - 1] + ' de ' + ym.slice(0, 4); }
+function imprimirFolhaTurma(d) {
+  const t = folhaTurmaTabela(d, true);
+  const html = '<!DOCTYPE html><html lang="pt-PT"><head><meta charset="utf-8"><title>Folha de turma</title><style>@page{size:A4 landscape;margin:12mm}body{font-family:Arial,Helvetica,sans-serif;color:#222}h1{font-size:18px;margin:0 0 2px}sup{vertical-align:super}tr{page-break-inside:avoid}</style></head><body>'
+    + '<h1>Folha de turma · ' + esc(d.turma.projeto) + '</h1>' + t.outerHTML + '<p style="font-size:10px;color:#888;margin-top:14px">SGArtes · Aulas · gerado a ' + new Date().toLocaleDateString('pt-PT') + '</p></body></html>';
+  const fr = h('iframe', { style: 'position:fixed;right:0;bottom:0;width:0;height:0;border:0' }); document.body.append(fr);
+  const w = fr.contentWindow; w.document.open(); w.document.write(html); w.document.close();
+  setTimeout(() => { try { w.focus(); w.print(); } catch (e) { toast('Não consegui abrir a impressão.'); } setTimeout(() => fr.remove(), 60000); }, 400);
 }
 async function saveAlunoEdit(a) {
   enqueue('aluno', a);
@@ -2385,7 +2488,7 @@ async function aulaModal(x, reload) {
     h('label', { class: 'l' }, 'Observações'), obs,
     h('button', { class: 'btn primary', style: 'margin-top:16px', onclick: async () => {
       const patch = { inicio: timeIn.value || st.inicio, duracaoMin: Number(durIn.value) || st.dur, observacoes: obs.value.trim() };
-      if (pres) patch.presencas = pres.map(p => ({ alunoId: p.alunoId, presente: !!p.presente })); else { patch.homens = st.h; patch.mulheres = st.m; }
+      if (pres) patch.presencas = pres.map(p => ({ alunoId: p.alunoId, presente: !!p.presente, etiqueta: p.etiqueta || '' })); else { patch.homens = st.h; patch.mulheres = st.m; }
       if (gest) { patch.data = dateIn.value; patch.grupoId = grupoSel.value; patch.profId = profSel.value; patch.removerFotos = [...rem]; patch.novasFotos = await Promise.all(novas.map(async d => { try { const lc = localById(x.local_id), bn = await bannerFor(lc, lc ? projById(lc.projeto_id) : null); return bn ? await composite(d, bn) : d; } catch (e) { return d; } })); }
       patch.tipoSessao = tipoSel.value; try { await API.editAula(x.id, patch); } catch (e) { toast(e.server ? e.message : 'Sem ligação. Corrigir aulas precisa de rede.'); return; }
       s.close(); toast('Aula corrigida ✓'); reload();
@@ -2566,7 +2669,7 @@ async function main() {
   }
 }
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.46';
+const BUILD = 'v2.47';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
