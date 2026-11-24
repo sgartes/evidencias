@@ -1266,7 +1266,7 @@ function deckStudents() {
 }
 async function cancelFlow() {
   const f = S.flow; const touched = Object.keys(f.marks).length || f.fotos.length || f.homens || f.mulheres || f.novos.length;
-  if (touched && !(await confirmBox('Cancelar esta aula?', 'O que já preencheste perde-se.', 'Cancelar aula'))) return;
+  if (touched && !(await confirmBox('Cancelar esta aula?', 'O que já preencheste perde-se.', 'Sair sem guardar', 'Continuar'))) return;
   S.flow = null; go('tab');
 }
 function counts() {
@@ -2921,7 +2921,7 @@ async function main() {
 }
 window.addEventListener('hashchange', () => { if (/^#rgpd=[a-f0-9]{20}$/.test(location.hash)) location.reload(); }); /* 2.49 */
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.54';
+const BUILD = 'v2.55';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
