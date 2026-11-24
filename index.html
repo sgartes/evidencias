@@ -1215,16 +1215,24 @@ function signModal(startLocal) {
   paintLocal();
 }
 function groupLine(g) { const l = localById(g.local_id); return `${g.hora_inicio} · ${durTxt(g.duracao_min || 60)}${g.nome && g.nome !== l.nome ? ' · ' + g.nome : ''}`; }
+/* 2.54: aviso de aulas deste local por assinar, no cartão da aula de hoje */
+function assinarAviso(localId, curto) {
+  const G = isGestor(), n = (G ? pendingSign() : signItems()).filter(x => x.localId === localId).length; if (!n) return null; /* o gestor vê as de todos os professores */
+  const abre = () => { if (G) S.sigAll = true; signModal(localId); };
+  if (curto) return h('button', { class: 'chip warn', style: 'margin-top:6px', onclick: abre }, `✍️ ${n} por assinar ›`);
+  return h('button', { type: 'button', onclick: abre, style: 'display:flex;align-items:center;gap:10px;width:100%;margin-top:10px;padding:10px 14px;border:0;border-radius:16px;background:var(--warn-l);color:var(--warn);text-align:left;font-size:14.5px;line-height:1.35' },
+    h('span', { style: 'font-size:20px' }, '✍️'), h('span', { class: 'grow' }, h('b', {}, `${n} aula${n === 1 ? '' : 's'} deste local por assinar.`), ' Aproveite a aula de hoje para pedir a assinatura.'), h('b', { style: 'white-space:nowrap' }, 'Assinar ›'));
+}
 function nextCard(g) {
   const l = localById(g.local_id);
-  return h('div', { class: 'card hero' }, h('div', { class: 'cap mut' }, 'Próxima aula'), h('div', { class: 'hero-t' }, l.nome), h('div', { class: 'mut' }, groupLine(g)), (() => { const n = S.d.alunos.filter(a => a.ativo !== 'nao' && a.local_id === g.local_id && (!a.grupo_id || a.grupo_id === g.id) && semRgpdA(a)).length; return g.com_lista === 'sim' && n ? h('div', { style: 'margin-top:6px' }, h('span', { class: 'chip rgpd' }, `🔏 ${n} aluno(s) sem RGPD nesta turma`)) : null; })(),
+  return h('div', { class: 'card hero' }, h('div', { class: 'cap mut' }, 'Próxima aula'), h('div', { class: 'hero-t' }, l.nome), h('div', { class: 'mut' }, groupLine(g)), (() => { const n = S.d.alunos.filter(a => a.ativo !== 'nao' && a.local_id === g.local_id && (!a.grupo_id || a.grupo_id === g.id) && semRgpdA(a)).length; return g.com_lista === 'sim' && n ? h('div', { style: 'margin-top:6px' }, h('span', { class: 'chip rgpd' }, `🔏 ${n} aluno(s) sem RGPD nesta turma`)) : null; })(), assinarAviso(g.local_id),
     h('button', { class: 'btn primary', style: 'margin-top:14px', onclick: () => startFlow(g, today()) }, '📸 Enviar evidências'),
     h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => semAulaModal(g, today()) }, 'Hoje não houve aula'), h('button', { class: 'link', onclick: () => avisarModal(g, today(), 'lembrete') }, 'Avisar a turma'), h('button', { class: 'link', onclick: () => atribuirModal(g, today()) }, 'Atribuir a outro professor')));
 }
 function classRow(g, date, subst) {
   const l = localById(g.local_id), done = closedFor(g.id, date), rec = done && S.recent.find(r => r.grupoId === g.id && r.data === date);
   return h('div', { class: 'card row', style: 'margin-bottom:10px' },
-    h('div', { class: 'grow' }, h('b', {}, l.nome), h('div', { class: 'mut cap' }, groupLine(g) + (subst ? ' · ' + ((profById(effProf(g, date)) || {}).nome || '') : '')), !done && !subst ? h('div', { style: 'display:flex;gap:14px;flex-wrap:wrap' }, h('button', { class: 'link', style: 'padding:4px 0;font-size:13.5px', onclick: () => semAulaModal(g, date) }, 'Não houve aula'), h('button', { class: 'link', style: 'padding:4px 0;font-size:13.5px', onclick: () => atribuirModal(g, date) }, 'Atribuir')) : null),
+    h('div', { class: 'grow' }, h('b', {}, l.nome), h('div', { class: 'mut cap' }, groupLine(g) + (subst ? ' · ' + ((profById(effProf(g, date)) || {}).nome || '') : '')), (!subst || isGestor()) && date === today() ? assinarAviso(g.local_id, true) : null, !done && !subst ? h('div', { style: 'display:flex;gap:14px;flex-wrap:wrap' }, h('button', { class: 'link', style: 'padding:4px 0;font-size:13.5px', onclick: () => semAulaModal(g, date) }, 'Não houve aula'), h('button', { class: 'link', style: 'padding:4px 0;font-size:13.5px', onclick: () => atribuirModal(g, date) }, 'Atribuir')) : null),
     done ? h('button', { class: 'chip ok', onclick: () => { if (rec) { S.doneId = rec.idCliente; go('done'); } } }, 'Enviada ✓')
       : h('button', { class: 'btn small primary', onclick: () => startFlow(g, date) }, subst ? 'Substituir' : 'Enviar evidências'));
 }
@@ -2913,7 +2921,7 @@ async function main() {
 }
 window.addEventListener('hashchange', () => { if (/^#rgpd=[a-f0-9]{20}$/.test(location.hash)) location.reload(); }); /* 2.49 */
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.53';
+const BUILD = 'v2.54';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
