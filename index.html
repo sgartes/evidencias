@@ -913,18 +913,31 @@ function viewHoje() {
     nl ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'sem'; go('tab', 'pend'); } }, `🗂️ ${nl} sem evidências ›`) : null,
     ns ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'assin'; go('tab', 'pend'); } }, `✍️ ${ns} por assinar ›`) : null,
     na ? h('button', { class: 'chip warn', onclick: () => { S.pend = 'aprov'; go('tab', 'pend'); } }, `⏳ ${na} por aprovar ›`) : null));
-  const pa = isGestor() ? proximosAnivs(5) : [], pp = isGestor() ? anivsPassados(7) : [];
-  if (pa.length || pp.length) collapsible(el, 'proxAniv', 'Aniversários', pa.length + pp.length, [h('div', { class: 'card', style: 'padding:6px 18px' }, ...pp.map(x => h('div', { class: 'row', style: 'opacity:.7' },
-    h('div', { style: 'min-width:46px;font-weight:700' }, x.dt.getDate() + '/' + String(x.dt.getMonth() + 1).padStart(2, '0')),
-    h('div', { class: 'grow' }, h('b', {}, x.nome), h('div', { class: 'mut cap' }, [`fez ${x.idade} anos`, x.dias === -1 ? 'ontem' : `há ${-x.dias} dias`, x.tipo + (x.local ? ' · ' + x.local : '')].join(' · '))))),
-    ...pa.map(x => h('div', { class: 'row', style: x.dias === 0 ? HOJE_ST : '' },
-    h('div', { style: 'min-width:46px;font-weight:700' }, x.dt.getDate() + '/' + String(x.dt.getMonth() + 1).padStart(2, '0')),
-    h('div', { class: 'grow' }, h('b', {}, x.nome), h('div', { class: 'mut cap' }, [`faz ${x.idade} anos`, x.dias === 0 ? 'hoje 🎂' : x.dias === 1 ? 'amanhã' : `daqui a ${x.dias} dias`, x.tipo + (x.local ? ' · ' + x.local : '')].join(' · '))))))]);
-  const bd = isGestor() ? [] : birthdays();
-  if (bd.length) collapsible(el, 'aniv', 'Aniversários', bd.length, [h('div', { class: 'card', style: 'padding:6px 18px' }, ...bd.map(x => h('div', { class: 'row', style: x.diff === 0 ? HOJE_ST : '' }, avatar(x.a), h('div', { class: 'grow' }, h('b', {}, x.a.nome), h('div', { class: 'mut cap' }, `${x.diff === 0 ? 'Faz anos hoje 🎂' : x.diff === 1 ? 'Faz anos amanhã' : x.diff > 1 ? `Faz anos daqui a ${x.diff} dias` : x.diff === -1 ? 'Fez anos ontem' : `Fez anos há ${-x.diff} dias`} · ${x.a.aniv.split('-').reverse().join('/')}`)))))]);
+  const anivs = isGestor() ? anivsPassados(7).concat(proximosAnivs(5)) : anivsProf();
+  if (anivs.length) collapsible(el, 'proxAniv', 'Aniversários', anivs.length, [anivsCard(anivs)]);
   const todo = S.recent.filter(r => r.post_estado === 'pendente' || r.estado === 'erro');
   if (todo.length) collapsible(el, 'todo', 'Por fazer', todo.length, todo.map(r => todoCard(r)));
   return el;
+}
+/* 2.53: lista de aniversários numa só linha do tempo (semana passada · hoje · próximos), igual para gestor e professores */
+const MESES3 = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
+function nomeCurto(n) { const p = String(n || '').trim().split(/\s+/); return p.length > 2 ? p[0] + ' ' + p[p.length - 1] : p.join(' '); }
+function anivsProf() {
+  const t = parseD(today()), lname = id => (S.d.locais.find(l => l.id === id) || {}).nome || '';
+  return birthdays().map(x => { const dt = new Date(t.getFullYear(), t.getMonth(), t.getDate() + x.diff), y = +String(x.a.data_nascimento || '').slice(0, 4); return { nome: x.a.nome, dt, idade: y ? dt.getFullYear() - y : null, local: lname(x.a.local_id), tipo: 'Aluno', dias: x.diff }; });
+}
+function anivLinha(x) {
+  const hoje = x.dias === 0, id = x.idade != null;
+  const quando = hoje ? '' : x.dias === -1 ? 'ontem' : x.dias < 0 ? `há ${-x.dias} dias` : x.dias === 1 ? 'amanhã' : `daqui a ${x.dias} dias`;
+  const sub = [hoje ? (id ? `faz ${x.idade} anos hoje 🎂` : 'faz anos hoje 🎂') : id ? (x.dias < 0 ? `fez ${x.idade}` : `${x.idade} anos`) : '', quando, x.tipo !== 'Aluno' ? x.tipo : '', x.local].filter(Boolean).join(' · ');
+  return h('div', { class: 'row', style: hoje ? HOJE_ST : '' },
+    h('div', { style: `width:52px;flex:none;text-align:center;border-radius:12px;padding:4px 0;background:${hoje ? '#fff' : 'var(--brand-l)'}` }, h('div', { style: 'font-size:22px;font-weight:800;line-height:1.1' }, String(x.dt.getDate())), h('div', { style: 'font-size:11px;font-weight:800;color:var(--brand-d);letter-spacing:.05em' }, MESES3[x.dt.getMonth()])),
+    h('div', { class: 'grow' }, h('b', {}, nomeCurto(x.nome)), h('div', { class: 'mut cap' }, sub)));
+}
+function anivsCard(list) {
+  const g = [['Semana passada', list.filter(x => x.dias < 0).sort((a, b) => a.dt - b.dt)], ['Hoje 🎂', list.filter(x => x.dias === 0)], ['Próximos', list.filter(x => x.dias > 0).sort((a, b) => a.dt - b.dt)]];
+  const parts = []; g.forEach(([t, it]) => { if (!it.length) return; parts.push(h('div', { style: 'font-size:12px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut);margin:12px 0 2px' }, t), ...it.map(anivLinha)); });
+  return h('div', { class: 'card', style: 'padding:2px 18px 8px' }, ...parts);
 }
 const LOOKBACK = 30;
 const HOJE_ST = 'background:#ffe8a3;border-left:5px solid var(--brand);border-radius:14px;margin:4px -10px;padding:8px 10px'; /* 2.52: aniversário de hoje em destaque */
@@ -2900,7 +2913,7 @@ async function main() {
 }
 window.addEventListener('hashchange', () => { if (/^#rgpd=[a-f0-9]{20}$/.test(location.hash)) location.reload(); }); /* 2.49 */
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.52';
+const BUILD = 'v2.53';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
