@@ -917,16 +917,17 @@ function viewHoje() {
   if (pa.length || pp.length) collapsible(el, 'proxAniv', 'Aniversários', pa.length + pp.length, [h('div', { class: 'card', style: 'padding:6px 18px' }, ...pp.map(x => h('div', { class: 'row', style: 'opacity:.7' },
     h('div', { style: 'min-width:46px;font-weight:700' }, x.dt.getDate() + '/' + String(x.dt.getMonth() + 1).padStart(2, '0')),
     h('div', { class: 'grow' }, h('b', {}, x.nome), h('div', { class: 'mut cap' }, [`fez ${x.idade} anos`, x.dias === -1 ? 'ontem' : `há ${-x.dias} dias`, x.tipo + (x.local ? ' · ' + x.local : '')].join(' · '))))),
-    ...pa.map(x => h('div', { class: 'row' },
+    ...pa.map(x => h('div', { class: 'row', style: x.dias === 0 ? HOJE_ST : '' },
     h('div', { style: 'min-width:46px;font-weight:700' }, x.dt.getDate() + '/' + String(x.dt.getMonth() + 1).padStart(2, '0')),
     h('div', { class: 'grow' }, h('b', {}, x.nome), h('div', { class: 'mut cap' }, [`faz ${x.idade} anos`, x.dias === 0 ? 'hoje 🎂' : x.dias === 1 ? 'amanhã' : `daqui a ${x.dias} dias`, x.tipo + (x.local ? ' · ' + x.local : '')].join(' · '))))))]);
   const bd = isGestor() ? [] : birthdays();
-  if (bd.length) collapsible(el, 'aniv', 'Aniversários', bd.length, [h('div', { class: 'card', style: 'padding:6px 18px' }, ...bd.map(x => h('div', { class: 'row' }, avatar(x.a), h('div', { class: 'grow' }, h('b', {}, x.a.nome), h('div', { class: 'mut cap' }, `${x.diff === 0 ? 'Faz anos hoje 🎂' : x.diff === 1 ? 'Faz anos amanhã' : x.diff > 1 ? `Faz anos daqui a ${x.diff} dias` : x.diff === -1 ? 'Fez anos ontem' : `Fez anos há ${-x.diff} dias`} · ${x.a.aniv.split('-').reverse().join('/')}`)))))]);
+  if (bd.length) collapsible(el, 'aniv', 'Aniversários', bd.length, [h('div', { class: 'card', style: 'padding:6px 18px' }, ...bd.map(x => h('div', { class: 'row', style: x.diff === 0 ? HOJE_ST : '' }, avatar(x.a), h('div', { class: 'grow' }, h('b', {}, x.a.nome), h('div', { class: 'mut cap' }, `${x.diff === 0 ? 'Faz anos hoje 🎂' : x.diff === 1 ? 'Faz anos amanhã' : x.diff > 1 ? `Faz anos daqui a ${x.diff} dias` : x.diff === -1 ? 'Fez anos ontem' : `Fez anos há ${-x.diff} dias`} · ${x.a.aniv.split('-').reverse().join('/')}`)))))]);
   const todo = S.recent.filter(r => r.post_estado === 'pendente' || r.estado === 'erro');
   if (todo.length) collapsible(el, 'todo', 'Por fazer', todo.length, todo.map(r => todoCard(r)));
   return el;
 }
 const LOOKBACK = 30;
+const HOJE_ST = 'background:#ffe8a3;border-left:5px solid var(--brand);border-radius:14px;margin:4px -10px;padding:8px 10px'; /* 2.52: aniversário de hoje em destaque */
 /* 2.46: os 5 próximos aniversários (alunos e equipa) para o gestor; a data de nascimento dos professores só o gestor tem */
 function listaAnivs_() {
   const t = parseD(today()), out = [], lname = id => (S.d.locais.find(l => l.id === id) || {}).nome || '';
@@ -2899,7 +2900,7 @@ async function main() {
 }
 window.addEventListener('hashchange', () => { if (/^#rgpd=[a-f0-9]{20}$/.test(location.hash)) location.reload(); }); /* 2.49 */
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.51';
+const BUILD = 'v2.52';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
