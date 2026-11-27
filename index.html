@@ -1202,7 +1202,8 @@ function signModal(startLocal) {
   }
   nameIn.addEventListener('input', upd);
   function paintLocal() { chipsBox.replaceChildren(...namesFor().map(n => h('button', { class: 'namechip', onclick: () => { nameIn.value = n; upd(); } }, n))); paintList(); }
-  const sel = h('select', { class: 'in', onchange: e => { localId = e.target.value; chosen.clear(); items().forEach(x => chosen.add(x.idCliente)); paintLocal(); } }, ...locais.map(id => h('option', { value: id }, (localById(id) || {}).nome || id)));
+  const sel = h('select', { class: 'in', onchange: e => { localId = e.target.value; chosen.clear(); items().forEach(x => chosen.add(x.idCliente)); paintLocal(); } }, ...locais.map(id => h('option', { value: id, selected: id === localId }, (localById(id) || {}).nome || id)));
+  sel.value = localId; /* 2.56: mostrar o local certo (antes aparecia sempre o primeiro) */
   const s = openSheet('Recolher assinatura', locais.length > 1 ? [h('label', { class: 'l', style: 'margin-top:0' }, 'Local'), sel] : h('b', {}, (localById(localId) || {}).nome), listBox,
     h('label', { class: 'l' }, 'Funcionário que assina'), nameIn, chipsBox, h('div', { style: 'height:12px' }), pad.el, h('div', { class: 'tools' }, h('button', { class: 'link', onclick: () => pad.clear() }, 'Limpar')), btn);
   btn.addEventListener('click', async () => {
@@ -2921,7 +2922,7 @@ async function main() {
 }
 window.addEventListener('hashchange', () => { if (/^#rgpd=[a-f0-9]{20}$/.test(location.hash)) location.reload(); }); /* 2.49 */
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.55';
+const BUILD = 'v2.56';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
