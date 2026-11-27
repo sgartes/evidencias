@@ -1178,7 +1178,8 @@ function lateItems() {
 }
 function pendingSign() {
   const out = [], seen = new Set();
-  S.recent.forEach(r => { seen.add(r.idCliente); if (r.semAssin && r.estado !== 'anulada') out.push({ idCliente: r.idCliente, aulaId: r.aulaId, localId: r.localId, data: r.data, inicio: r.inicio, profId: r.profId || S.me.id, homens: r.homens, mulheres: r.mulheres }); });
+  const srv = new Map(S.d.aulas.map(a => [a.id_cliente, a])); /* 2.57: o servidor manda; um registo antigo no telemóvel não volta a pedir assinatura */
+  S.recent.forEach(r => { seen.add(r.idCliente); const sa = srv.get(r.idCliente); if (r.semAssin && sa && !sa.sem_assinatura) { r.semAssin = false; r.nomeResp = r.nomeResp || sa.nome_resp; } if (r.semAssin && r.estado !== 'anulada') out.push({ idCliente: r.idCliente, aulaId: r.aulaId, localId: r.localId, data: r.data, inicio: r.inicio, profId: r.profId || S.me.id, homens: r.homens, mulheres: r.mulheres }); });
   S.d.aulas.forEach(a => { if (a.sem_assinatura && a.estado !== 'anulada' && !seen.has(a.id_cliente)) { seen.add(a.id_cliente); out.push({ idCliente: a.id_cliente, aulaId: a.id, localId: a.local_id, data: String(a.data), inicio: a.hora_inicio, profId: a.prof_deu_id, homens: a.homens, mulheres: a.mulheres, aula: a }); } });
   return out.sort((a, b) => (a.data + a.inicio).localeCompare(b.data + b.inicio));
 }
@@ -2922,7 +2923,7 @@ async function main() {
 }
 window.addEventListener('hashchange', () => { if (/^#rgpd=[a-f0-9]{20}$/.test(location.hash)) location.reload(); }); /* 2.49 */
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.56';
+const BUILD = 'v2.57';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
