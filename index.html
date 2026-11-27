@@ -2815,7 +2815,11 @@ function reconcileRecent(r) {
   const d0 = new Date(Date.now() - 55 * 86400000), corte = `${d0.getFullYear()}-${pad2(d0.getMonth() + 1)}-${pad2(d0.getDate())}`, ids = new Set(r.aulas.map(a => a.id));
   const antes = S.recent.length;
   S.recent = S.recent.filter(x => !(x.estado === 'enviada' && x.aulaId && String(x.data) > corte && !ids.has(x.aulaId)));
-  if (S.recent.length !== antes) saveRecent();
+  /* 2.58: o estado da assinatura no telemóvel passa a copiar sempre o do servidor (nos dois sentidos), para nunca mostrar «por assinar» uma aula já assinada
+     noutro aparelho, nem esconder uma aula cuja assinatura não chegou ao servidor. Só corre sem nada por enviar. */
+  const porId = new Map(r.aulas.map(a => [a.id_cliente, a])); let mudou = S.recent.length !== antes;
+  S.recent.forEach(x => { const a = porId.get(x.idCliente); if (!a) return; const sa = !!a.sem_assinatura; if (!!x.semAssin !== sa) { x.semAssin = sa; if (!sa && a.nome_resp) x.nomeResp = a.nome_resp; mudou = true; } });
+  if (mudou) saveRecent();
 }
 function applyBoot(r, fresh) {
   S.d = { projetos: r.projetos || [], locais: r.locais || [], grupos: r.grupos || [], professores: r.professores || [], alunos: r.alunos || [], atrib: r.atrib || [], semAulas: r.semAulas || [], calend: r.calend || [], aulas: r.aulas || [], aprovacoes: r.aprovacoes || [], gestao: r.gestao || null };
@@ -2923,7 +2927,7 @@ async function main() {
 }
 window.addEventListener('hashchange', () => { if (/^#rgpd=[a-f0-9]{20}$/.test(location.hash)) location.reload(); }); /* 2.49 */
 if (IS_GS && 'serviceWorker' in navigator) { try { navigator.serviceWorker.register('sw.js').catch(() => { }); } catch (e) { } }
-const BUILD = 'v2.57';
+const BUILD = 'v2.58';
 let updShown = false;
 async function checkUpdate() {
   if (updShown || !navigator.onLine) return;
